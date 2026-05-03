@@ -1,7 +1,11 @@
-import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
+import type { Request, Response } from "express";
+import { onRequest } from "firebase-functions/v2/https";
+import { setGlobalOptions } from "firebase-functions/v2/options";
+
+setGlobalOptions({ region: "asia-southeast1" });
 import { app } from "../../src/app.js";
 
-export const api = async (req: ExpressRequest, res: ExpressResponse) => {
+const handler = async (req: Request, res: Response) => {
   const url = `https://${req.headers.host}${req.url}`;
 
   const headers = new Headers();
@@ -30,3 +34,12 @@ export const api = async (req: ExpressRequest, res: ExpressResponse) => {
   const body = await webResponse.text();
   res.send(body);
 };
+
+export const api = onRequest(
+  {
+    timeoutSeconds: 60,
+    minInstances: 0,
+    maxInstances: 100,
+  },
+  handler,
+);
