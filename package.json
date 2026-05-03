@@ -1,0 +1,36 @@
+{
+  "name": "novel-be",
+  "version": "1.0.0",
+  "description": "Novel reading website backend",
+  "main": "dist/adapters/firebase/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --env-file=.env --import tsx/esm adapters/standalone/index.ts",
+    "serve": "firebase emulators:start",
+    "deploy": "firebase deploy --only functions",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "lint": "biome check src/ adapters/ tests/",
+    "format": "biome format --write src/ adapters/ tests/",
+    "start": "node --env-file=.env dist/adapters/standalone/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.1",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.3.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "ts-node": "^10.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
