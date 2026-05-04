@@ -13,6 +13,8 @@ export default {
   },
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
+    "^firebase-admin$": "<rootDir>/tests/__mocks__/firebase-admin.ts",
+    "(.+)/config/env\\.js$": "<rootDir>/tests/__mocks__/config-env.ts",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
 };
