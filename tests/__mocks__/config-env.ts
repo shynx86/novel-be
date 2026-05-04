@@ -4,5 +4,6 @@ export const env = {
   nodeEnv: "test",
   projectId: "test-project",
   firebaseApiKey: "test-api-key",
+  firestoreDatabaseId: "",
   version: "1.0.0",
 };

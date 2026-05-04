@@ -3,6 +3,7 @@ import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
 
 let adminApp: admin.app.App | null = null;
+let firestoreInstance: admin.firestore.Firestore | null = null;
 
 export function getAdminApp(): admin.app.App {
   if (!adminApp) {
@@ -19,5 +20,11 @@ export function getAuth(): admin.auth.Auth {
 }
 
 export function getFirestore(): admin.firestore.Firestore {
-  return getAdminApp().firestore();
+  if (!firestoreInstance) {
+    firestoreInstance = getAdminApp().firestore();
+    if (env.firestoreDatabaseId) {
+      firestoreInstance.settings({ databaseId: env.firestoreDatabaseId });
+    }
+  }
+  return firestoreInstance;
 }
