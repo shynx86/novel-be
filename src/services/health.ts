@@ -1,24 +1,6 @@
-import admin from "firebase-admin";
 import { env } from "../config/env.js";
 import { logger } from "../utils/logger.js";
-
-let adminApp: admin.app.App | null = null;
-let initError: string | null = null;
-
-function getAdminApp(): admin.app.App | null {
-  try {
-    if (!adminApp) {
-      adminApp = admin.initializeApp({
-        projectId: env.projectId || undefined,
-      });
-    }
-    return adminApp;
-  } catch (err) {
-    initError = err instanceof Error ? err.message : String(err);
-    logger.error("Firebase Admin init failed", { error: initError });
-    return null;
-  }
-}
+import { getAdminApp } from "./firebase.js";
 
 export interface HealthStatus {
   status: "ok" | "degraded" | "error";
@@ -39,7 +21,6 @@ export async function checkHealth(): Promise<HealthStatus> {
   const app = getAdminApp();
   if (!app) {
     firestoreStatus = "not_configured";
-    firestoreError = initError ?? undefined;
   } else {
     try {
       // List collections proves: API is enabled, credentials work, database exists

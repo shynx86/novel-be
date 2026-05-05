@@ -1,20 +1,12 @@
-import admin from "firebase-admin";
+import type admin from "firebase-admin";
 import type { Context, MiddlewareHandler } from "hono";
+import { getAuth } from "../services/firebase.js";
 import { UnauthorizedError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
-let adminApp: admin.app.App | null = null;
-
-function getAdminApp(): admin.app.App {
-  if (!adminApp) {
-    adminApp = admin.initializeApp();
-  }
-  return adminApp;
-}
-
 export async function verifyToken(token: string): Promise<admin.auth.DecodedIdToken> {
-  const app = getAdminApp();
-  return app.auth().verifyIdToken(token);
+  const auth = getAuth();
+  return auth.verifyIdToken(token);
 }
 
 export const authMiddleware: MiddlewareHandler = async (c: Context, next) => {
