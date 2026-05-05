@@ -63,7 +63,18 @@ async function getUserDocument(uid: string): Promise<UserDocument | null> {
 async function getOrCreateUserDocument(uid: string, data: CreateUserData): Promise<UserDocument> {
   const existing = await getUserDocument(uid);
   if (existing) return existing;
-  return createUserDocument(uid, data);
+
+  // Use merge to avoid overwriting if another request created the doc concurrently
+  const db = getFirestore();
+  const userDoc = buildUserDoc(uid, data);
+  await db.collection("users").doc(uid).set(userDoc, { merge: true });
+
+  // Re-fetch to get the authoritative state (in case merge kept existing values)
+  const saved = await getUserDocument(uid);
+  if (!saved) {
+    throw new AppError(500, "Failed to create user document", "USER_CREATE_ERROR");
+  }
+  return saved;
 }
 
 async function exchangeCustomToken(
@@ -228,16 +239,14 @@ export async function loginWithEmail(email: string, password: string): Promise<A
 
   const uid = body.localId as string;
   const userEmail = body.email as string;
+  const idToken = body.idToken as string;
+  const refreshToken = body.refreshToken as string;
 
   // Get or create Firestore user doc (self-healing)
   const user = await getOrCreateUserDocument(uid, {
     email: userEmail,
     display_name: `user_${uid}`,
   });
-
-  // Generate custom token and exchange for ID token
-  const customToken = await getAuth().createCustomToken(uid);
-  const { idToken, refreshToken } = await exchangeCustomToken(customToken);
 
   logger.info("User logged in", { uid, email: userEmail });
 

@@ -38,6 +38,19 @@ function mockExchangeFetch(): typeof fetch {
     })) as unknown as typeof fetch;
 }
 
+function mockLoginFetch(): typeof fetch {
+  return (() =>
+    Promise.resolve({
+      ok: true,
+      json: async () => ({
+        localId: "uid-123",
+        email: "test@test.com",
+        idToken: mockIdToken,
+        refreshToken: mockRefreshToken,
+      }),
+    })) as unknown as typeof fetch;
+}
+
 function setupMocksForSuccessfulRegistration() {
   mockCreateUser.mockResolvedValue(mockUserRecord);
   mockDocSet.mockResolvedValue(undefined);
@@ -158,27 +171,7 @@ describe("POST /api/auth/login", () => {
 
   it("returns 200 with user, idToken and refreshToken on valid credentials", async () => {
     setupMocksForExistingUser();
-
-    // Mock fetch for both Identity Toolkit login and token exchange
-    let callCount = 0;
-    globalThis.fetch = (() => {
-      callCount++;
-      if (callCount === 1) {
-        // First call: signInWithPassword
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ localId: "uid-123", email: "test@test.com" }),
-        });
-      }
-      // Second call: signInWithCustomToken (exchange)
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          idToken: mockIdToken,
-          refreshToken: mockRefreshToken,
-        }),
-      });
-    }) as unknown as typeof fetch;
+    globalThis.fetch = mockLoginFetch();
 
     const res = await app.request("/api/auth/login", {
       method: "POST",
@@ -232,28 +225,13 @@ describe("POST /api/auth/login", () => {
   });
 
   it("auto-creates Firestore doc when Auth user exists but doc doesn't", async () => {
+    // First get: doc doesn't exist → triggers create
+    // Second get: re-fetch after set with merge
     mockDocGet
       .mockResolvedValueOnce({ exists: false, data: () => undefined })
       .mockResolvedValueOnce({ exists: true, data: () => ({ ...mockUserDoc }) });
     mockDocSet.mockResolvedValue(undefined);
-
-    let callCount = 0;
-    globalThis.fetch = (() => {
-      callCount++;
-      if (callCount === 1) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ localId: "uid-123", email: "test@test.com" }),
-        });
-      }
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          idToken: mockIdToken,
-          refreshToken: mockRefreshToken,
-        }),
-      });
-    }) as unknown as typeof fetch;
+    globalThis.fetch = mockLoginFetch();
 
     const res = await app.request("/api/auth/login", {
       method: "POST",
@@ -308,7 +286,17 @@ describe("POST /api/auth/google", () => {
   });
 
   it("returns 201 for new user (auto-register)", async () => {
-    mockDocGet.mockResolvedValue({ exists: false, data: () => undefined });
+    const googleUserDoc = {
+      ...mockUserDoc,
+      uid: "google-uid-456",
+      email: "user@gmail.com",
+      display_name: "Jane Smith",
+      avatar_url: "https://lh3.googleusercontent.com/avatar",
+    };
+    mockDocGet
+      .mockResolvedValueOnce({ exists: false, data: () => undefined }) // isNewUser check
+      .mockResolvedValueOnce({ exists: false, data: () => undefined }) // getOrCreate check
+      .mockResolvedValueOnce({ exists: true, data: () => googleUserDoc }); // re-fetch after merge
     mockDocSet.mockResolvedValue(undefined);
 
     const res = await app.request("/api/auth/google", {
@@ -348,7 +336,17 @@ describe("POST /api/auth/google", () => {
   });
 
   it("populates avatar_url from Google profile picture", async () => {
-    mockDocGet.mockResolvedValue({ exists: false, data: () => undefined });
+    const googleUserDoc = {
+      ...mockUserDoc,
+      uid: "google-uid-456",
+      email: "user@gmail.com",
+      display_name: "Jane Smith",
+      avatar_url: "https://lh3.googleusercontent.com/avatar",
+    };
+    mockDocGet
+      .mockResolvedValueOnce({ exists: false, data: () => undefined }) // isNewUser check
+      .mockResolvedValueOnce({ exists: false, data: () => undefined }) // getOrCreate check
+      .mockResolvedValueOnce({ exists: true, data: () => googleUserDoc }); // re-fetch after merge
     mockDocSet.mockResolvedValue(undefined);
 
     const res = await app.request("/api/auth/google", {
