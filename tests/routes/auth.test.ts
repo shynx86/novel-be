@@ -24,6 +24,19 @@ const mockUserDoc = {
 };
 
 const mockCustomToken = "mock-custom-token";
+const mockIdToken = "mock-id-token";
+const mockRefreshToken = "mock-refresh-token";
+
+function mockExchangeFetch(): typeof fetch {
+  return (() =>
+    Promise.resolve({
+      ok: true,
+      json: async () => ({
+        idToken: mockIdToken,
+        refreshToken: mockRefreshToken,
+      }),
+    })) as unknown as typeof fetch;
+}
 
 function setupMocksForSuccessfulRegistration() {
   mockCreateUser.mockResolvedValue(mockUserRecord);
@@ -38,15 +51,23 @@ function setupMocksForExistingUser() {
   });
 }
 
+let originalFetch: typeof fetch;
+
 beforeEach(() => {
   jest.clearAllMocks();
+  originalFetch = globalThis.fetch;
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
 });
 
 // ─── POST /api/auth/register ─────────────────────────────────────────
 
 describe("POST /api/auth/register", () => {
-  it("returns 201 with user and customToken on success", async () => {
+  it("returns 201 with user, idToken and refreshToken on success", async () => {
     setupMocksForSuccessfulRegistration();
+    globalThis.fetch = mockExchangeFetch();
 
     const res = await app.request("/api/auth/register", {
       method: "POST",
@@ -61,13 +82,15 @@ describe("POST /api/auth/register", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data).toHaveProperty("user");
-    expect(body.data).toHaveProperty("customToken", mockCustomToken);
+    expect(body.data).toHaveProperty("idToken", mockIdToken);
+    expect(body.data).toHaveProperty("refreshToken", mockRefreshToken);
     expect(body.data.user.email).toBe("test@test.com");
     expect(body.data.user.display_name).toBe("Test User");
   });
 
   it("returns 201 with user_{uid} as display_name when not provided", async () => {
     setupMocksForSuccessfulRegistration();
+    globalThis.fetch = mockExchangeFetch();
 
     const res = await app.request("/api/auth/register", {
       method: "POST",
@@ -133,15 +156,29 @@ describe("POST /api/auth/login", () => {
     mockCreateCustomToken.mockResolvedValue(mockCustomToken);
   });
 
-  it("returns 200 with user and customToken on valid credentials", async () => {
+  it("returns 200 with user, idToken and refreshToken on valid credentials", async () => {
     setupMocksForExistingUser();
 
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.resolve({
+    // Mock fetch for both Identity Toolkit login and token exchange
+    let callCount = 0;
+    globalThis.fetch = (() => {
+      callCount++;
+      if (callCount === 1) {
+        // First call: signInWithPassword
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ localId: "uid-123", email: "test@test.com" }),
+        });
+      }
+      // Second call: signInWithCustomToken (exchange)
+      return Promise.resolve({
         ok: true,
-        json: async () => ({ localId: "uid-123", email: "test@test.com" }),
-      })) as unknown as typeof fetch;
+        json: async () => ({
+          idToken: mockIdToken,
+          refreshToken: mockRefreshToken,
+        }),
+      });
+    }) as unknown as typeof fetch;
 
     const res = await app.request("/api/auth/login", {
       method: "POST",
@@ -149,16 +186,14 @@ describe("POST /api/auth/login", () => {
       body: JSON.stringify({ email: "test@test.com", password: "123456" }),
     });
 
-    globalThis.fetch = originalFetch;
-
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.user.email).toBe("test@test.com");
-    expect(body.data.customToken).toBe(mockCustomToken);
+    expect(body.data.idToken).toBe(mockIdToken);
+    expect(body.data.refreshToken).toBe(mockRefreshToken);
   });
 
   it("returns 401 when credentials are invalid", async () => {
-    const originalFetch = globalThis.fetch;
     globalThis.fetch = (() =>
       Promise.resolve({
         ok: false,
@@ -170,8 +205,6 @@ describe("POST /api/auth/login", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "test@test.com", password: "wrong" }),
     });
-
-    globalThis.fetch = originalFetch;
 
     expect(res.status).toBe(401);
     const body = await res.json();
@@ -204,20 +237,29 @@ describe("POST /api/auth/login", () => {
       .mockResolvedValueOnce({ exists: true, data: () => ({ ...mockUserDoc }) });
     mockDocSet.mockResolvedValue(undefined);
 
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = (() =>
-      Promise.resolve({
+    let callCount = 0;
+    globalThis.fetch = (() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ localId: "uid-123", email: "test@test.com" }),
+        });
+      }
+      return Promise.resolve({
         ok: true,
-        json: async () => ({ localId: "uid-123", email: "test@test.com" }),
-      })) as unknown as typeof fetch;
+        json: async () => ({
+          idToken: mockIdToken,
+          refreshToken: mockRefreshToken,
+        }),
+      });
+    }) as unknown as typeof fetch;
 
     const res = await app.request("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "test@test.com", password: "123456" }),
     });
-
-    globalThis.fetch = originalFetch;
 
     expect(res.status).toBe(200);
     expect(mockDocSet).toHaveBeenCalled();
@@ -237,9 +279,10 @@ describe("POST /api/auth/google", () => {
   beforeEach(() => {
     mockVerifyIdToken.mockResolvedValue(mockDecodedToken);
     mockCreateCustomToken.mockResolvedValue(mockCustomToken);
+    globalThis.fetch = mockExchangeFetch();
   });
 
-  it("returns 200 with user and customToken for existing user", async () => {
+  it("returns 200 with user, idToken and refreshToken for existing user", async () => {
     mockDocGet.mockResolvedValue({
       exists: true,
       data: () => ({
@@ -260,7 +303,8 @@ describe("POST /api/auth/google", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.user.display_name).toBe("Jane Smith");
-    expect(body.data.customToken).toBe(mockCustomToken);
+    expect(body.data.idToken).toBe(mockIdToken);
+    expect(body.data.refreshToken).toBe(mockRefreshToken);
   });
 
   it("returns 201 for new user (auto-register)", async () => {
@@ -316,6 +360,80 @@ describe("POST /api/auth/google", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.user.avatar_url).toBe("https://lh3.googleusercontent.com/avatar");
+  });
+});
+
+// ─── POST /api/auth/refresh ──────────────────────────────────────────
+
+describe("POST /api/auth/refresh", () => {
+  it("returns 200 with new idToken and refreshToken", async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id_token: "new-id-token",
+          refresh_token: "new-refresh-token",
+        }),
+      })) as unknown as typeof fetch;
+
+    const res = await app.request("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: "valid-refresh-token" }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.idToken).toBe("new-id-token");
+    expect(body.data.refreshToken).toBe("new-refresh-token");
+  });
+
+  it("returns 401 when refresh_token is invalid", async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve({
+        ok: false,
+        json: async () => ({ error: { message: "INVALID_REFRESH_TOKEN" } }),
+      })) as unknown as typeof fetch;
+
+    const res = await app.request("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: "invalid-token" }),
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("returns 400 when refresh_token is missing", async () => {
+    const res = await app.request("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("returns 401 when refresh_token is expired", async () => {
+    globalThis.fetch = (() =>
+      Promise.resolve({
+        ok: false,
+        json: async () => ({ error: { message: "TOKEN_EXPIRED" } }),
+      })) as unknown as typeof fetch;
+
+    const res = await app.request("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: "expired-token" }),
+    });
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error.code).toBe("UNAUTHORIZED");
   });
 });
 

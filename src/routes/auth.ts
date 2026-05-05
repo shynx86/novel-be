@@ -4,6 +4,7 @@ import {
   getUserProfile,
   loginWithEmail,
   loginWithGoogle,
+  refreshIdToken,
   registerWithEmail,
 } from "../services/auth.js";
 import { ValidationError } from "../utils/errors.js";
@@ -71,6 +72,19 @@ auth.post("/google", async (c) => {
   const { isNewUser, ...data } = result;
 
   return c.json({ data }, status);
+});
+
+// POST /api/auth/refresh
+auth.post("/refresh", async (c) => {
+  const body = await c.req.json<{ refresh_token?: string }>();
+
+  if (!body.refresh_token || typeof body.refresh_token !== "string") {
+    throw new ValidationError("refresh_token is required", { field: "refresh_token" });
+  }
+
+  const data = await refreshIdToken(body.refresh_token);
+
+  return c.json({ data }, 200);
 });
 
 // GET /api/auth/me (protected)

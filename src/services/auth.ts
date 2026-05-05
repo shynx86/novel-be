@@ -15,8 +15,14 @@ export interface UserDocument {
 
 export interface AuthResponse {
   user: UserDocument;
-  customToken: string;
+  idToken: string;
+  refreshToken: string;
   isNewUser?: boolean;
+}
+
+export interface RefreshResponse {
+  idToken: string;
+  refreshToken: string;
 }
 
 interface CreateUserData {
@@ -60,6 +66,80 @@ async function getOrCreateUserDocument(uid: string, data: CreateUserData): Promi
   return createUserDocument(uid, data);
 }
 
+async function exchangeCustomToken(
+  customToken: string,
+): Promise<{ idToken: string; refreshToken: string }> {
+  if (!env.firebaseApiKey) {
+    throw new AppError(500, "Authentication service not configured", "AUTH_SERVICE_ERROR");
+  }
+
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${env.firebaseApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        token: customToken,
+        returnSecureToken: true,
+      }),
+    },
+  );
+
+  const body = await response.json();
+
+  if (!response.ok) {
+    logger.error("Failed to exchange custom token", {
+      status: response.status,
+      error: body?.error?.message,
+    });
+    throw new AppError(500, "Failed to exchange token", "TOKEN_EXCHANGE_ERROR");
+  }
+
+  return {
+    idToken: body.idToken as string,
+    refreshToken: body.refreshToken as string,
+  };
+}
+
+export async function refreshIdToken(refreshToken: string): Promise<RefreshResponse> {
+  if (!env.firebaseApiKey) {
+    throw new AppError(500, "Authentication service not configured", "AUTH_SERVICE_ERROR");
+  }
+
+  const response = await fetch(
+    `https://securetoken.googleapis.com/v1/token?key=${env.firebaseApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      }),
+    },
+  );
+
+  const body = await response.json();
+
+  if (!response.ok) {
+    const errorMessage = body?.error?.message as string | undefined;
+
+    if (errorMessage === "TOKEN_EXPIRED" || errorMessage === "INVALID_REFRESH_TOKEN") {
+      throw new UnauthorizedError("Invalid or expired refresh token");
+    }
+
+    logger.error("Failed to refresh token", {
+      status: response.status,
+      error: errorMessage,
+    });
+    throw new UnauthorizedError("Token refresh failed");
+  }
+
+  return {
+    idToken: body.id_token as string,
+    refreshToken: body.refresh_token as string,
+  };
+}
+
 export async function registerWithEmail(
   email: string,
   password: string,
@@ -94,12 +174,13 @@ export async function registerWithEmail(
     display_name: displayName || `user_${userRecord.uid}`,
   });
 
-  // Generate custom token
+  // Generate custom token and exchange for ID token
   const customToken = await auth.createCustomToken(userRecord.uid);
+  const { idToken, refreshToken } = await exchangeCustomToken(customToken);
 
   logger.info("User registered", { uid: userRecord.uid, email });
 
-  return { user, customToken };
+  return { user, idToken, refreshToken };
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<AuthResponse> {
@@ -154,21 +235,22 @@ export async function loginWithEmail(email: string, password: string): Promise<A
     display_name: `user_${uid}`,
   });
 
-  // Generate custom token
+  // Generate custom token and exchange for ID token
   const customToken = await getAuth().createCustomToken(uid);
+  const { idToken, refreshToken } = await exchangeCustomToken(customToken);
 
   logger.info("User logged in", { uid, email: userEmail });
 
-  return { user, customToken };
+  return { user, idToken, refreshToken };
 }
 
-export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
+export async function loginWithGoogle(googleIdToken: string): Promise<AuthResponse> {
   const auth = getAuth();
 
   // Verify the Google ID token
   let decodedToken: admin.auth.DecodedIdToken;
   try {
-    decodedToken = await auth.verifyIdToken(idToken);
+    decodedToken = await auth.verifyIdToken(googleIdToken);
   } catch (err) {
     logger.warn("Google ID token verification failed", {
       error: err instanceof Error ? err.message : String(err),
@@ -189,8 +271,9 @@ export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
     avatar_url: picture || undefined,
   });
 
-  // Generate custom token
+  // Generate custom token and exchange for ID token
   const customToken = await auth.createCustomToken(uid);
+  const { idToken, refreshToken } = await exchangeCustomToken(customToken);
 
   logger.info("User logged in with Google", {
     uid,
@@ -198,7 +281,7 @@ export async function loginWithGoogle(idToken: string): Promise<AuthResponse> {
     isNewUser,
   });
 
-  return { user, customToken, isNewUser };
+  return { user, idToken, refreshToken, isNewUser };
 }
 
 export async function getUserProfile(uid: string): Promise<UserDocument> {
