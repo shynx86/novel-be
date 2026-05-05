@@ -32,7 +32,7 @@ Backend server for a novel reading website. Built with Hono on Node.js, deployed
 
 4. **Get the Firebase Web API key**
 
-   Ping @chunnc to get the `FIREBASE_API_KEY` value, then update it in your `.env` file.
+   Ping @chunnc to get the `WEB_API_KEY` value, then update it in your `.env` file.
 
 5. **Login to Firebase**
 
