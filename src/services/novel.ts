@@ -79,6 +79,10 @@ export async function listNovels(params: {
     query = query.where("status", "==", params.status);
   }
 
+  if (params.genre) {
+    query = query.where("genre", "array-contains", params.genre);
+  }
+
   // Get total count
   const totalCount = await query.count().get();
   const total = totalCount.data().count;
@@ -93,11 +97,7 @@ export async function listNovels(params: {
   const snapshot = await query.limit(limit).get();
   const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
 
-  // Filter by genre in memory (array-contains would need a separate query)
-  const genre = params.genre;
-  const filtered = genre ? novels.filter((n) => n.genre.includes(genre)) : novels;
-
-  return { items: filtered, page, limit, total };
+  return { items: novels, page, limit, total };
 }
 
 export async function updateNovel(

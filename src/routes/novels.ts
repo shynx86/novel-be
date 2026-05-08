@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
-import { getChapter, getChapterMeta, listChapters } from "../services/chapter.js";
+import { getChapter, listChapters } from "../services/chapter.js";
 import { getNovel, listNovels } from "../services/novel.js";
-import { checkSubscriptionAccess } from "../services/subscription.js";
+import { checkSubscriptionAccess, getUserSubscriptionsForNovel } from "../services/subscription.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/errors.js";
 
 type Variables = {
@@ -41,25 +41,19 @@ novels.get("/:novelId/chapters", optionalAuthMiddleware, async (c) => {
   // If user is authenticated, annotate with subscription status
   const userId = c.get("userId") as string | undefined;
   if (userId) {
-    const { checkSubscriptionAccess } = await import("../services/subscription.js");
-    const { getNovel } = await import("../services/novel.js");
-
-    // Check novel-level subscription once
-    const hasNovelSub = await checkSubscriptionAccess(userId, novelId, -1);
-
-    const annotatedItems = await Promise.all(
-      result.items.map(async (chapter) => {
-        if (chapter.access_type !== "paid") {
-          return { ...chapter, is_subscribed: true };
-        }
-        if (hasNovelSub) {
-          return { ...chapter, is_subscribed: true };
-        }
-        const hasAccess = await checkSubscriptionAccess(userId, novelId, chapter.index);
-        return { ...chapter, is_subscribed: hasAccess };
-      }),
+    // Single query to get all subscriptions for this user+novel
+    const { hasNovelSub, subscribedChapterIndices } = await getUserSubscriptionsForNovel(
+      userId,
+      novelId,
     );
-    result.items = annotatedItems;
+
+    result.items = result.items.map((chapter) => {
+      if (chapter.access_type !== "paid") {
+        return { ...chapter, is_subscribed: true };
+      }
+      const isSubscribed = hasNovelSub || subscribedChapterIndices.has(chapter.index);
+      return { ...chapter, is_subscribed: isSubscribed };
+    });
   }
 
   return c.json({ data: result }, 200);
@@ -91,8 +85,10 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
       const hasAccess = await checkSubscriptionAccess(userId, novelId, index);
       if (!hasAccess) {
         const novel = await getNovel(novelId);
-        throw new ForbiddenError("You have not subscribed to this chapter");
-        // details are handled via the access check endpoint
+        throw new ForbiddenError("You have not subscribed to this chapter", {
+          chapter_price: chapter.price,
+          novel_price: novel.price,
+        });
       }
 
       return c.json({ data: chapter }, 200);

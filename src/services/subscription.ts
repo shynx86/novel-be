@@ -48,6 +48,33 @@ export async function checkSubscriptionAccess(
   return chapterSub.exists;
 }
 
+export async function getUserSubscriptionsForNovel(
+  userId: string,
+  novelId: string,
+): Promise<{ hasNovelSub: boolean; subscribedChapterIndices: Set<number> }> {
+  const db = getFirestore();
+
+  const snapshot = await db
+    .collection("subscriptions")
+    .where("user_id", "==", userId)
+    .where("novel_id", "==", novelId)
+    .get();
+
+  let hasNovelSub = false;
+  const subscribedChapterIndices = new Set<number>();
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (data.chapter_index === -1) {
+      hasNovelSub = true;
+    } else {
+      subscribedChapterIndices.add(data.chapter_index);
+    }
+  }
+
+  return { hasNovelSub, subscribedChapterIndices };
+}
+
 export async function subscribeChapter(
   userId: string,
   novelId: string,

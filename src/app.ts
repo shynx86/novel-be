@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { requestLogger } from "./middleware/request-logger.js";
 import { registerRoutes } from "./routes/index.js";
-import { AppError, PaymentRequiredError, ValidationError } from "./utils/errors.js";
+import { AppError, ForbiddenError, PaymentRequiredError, ValidationError } from "./utils/errors.js";
 import { logger } from "./utils/logger.js";
 
 const app = new Hono();
@@ -35,7 +35,9 @@ app.onError((err, c) => {
         error: {
           code: err.code,
           message: err.message,
-          ...((err instanceof ValidationError || err instanceof PaymentRequiredError) && {
+          ...((err instanceof ValidationError ||
+            err instanceof PaymentRequiredError ||
+            err instanceof ForbiddenError) && {
             details: err.details,
           }),
         },

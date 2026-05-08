@@ -8,7 +8,7 @@ import {
   listChapters,
   updateChapter,
 } from "../services/chapter.js";
-import { createNovel, deleteNovel, getNovel, updateNovel } from "../services/novel.js";
+import { createNovel, deleteNovel, getNovel, listNovels, updateNovel } from "../services/novel.js";
 import { ValidationError } from "../utils/errors.js";
 
 type Variables = {
@@ -48,7 +48,6 @@ adminNovels.post("/", async (c) => {
 
 // GET /api/admin/novels
 adminNovels.get("/", async (c) => {
-  const { listNovels } = await import("../services/novel.js");
   const page = Number(c.req.query("page")) || 1;
   const limit = Number(c.req.query("limit")) || 20;
   const genre = c.req.query("genre");

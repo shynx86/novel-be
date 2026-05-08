@@ -33,8 +33,11 @@ export class UnauthorizedError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = "Forbidden") {
+  public readonly details?: unknown;
+
+  constructor(message = "Forbidden", details?: unknown) {
     super(403, message, "FORBIDDEN");
+    this.details = details;
   }
 }
 

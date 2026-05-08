@@ -5,7 +5,7 @@ import type {
   ChapterUpdateInput,
   PaginatedResult,
 } from "../types/novel.js";
-import { NotFoundError, ValidationError } from "../utils/errors.js";
+import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 import { getNovel } from "./novel.js";
@@ -140,49 +140,51 @@ export async function createChapter(
   input: ChapterCreateInput,
 ): Promise<ChapterDocument> {
   const db = getFirestore();
-  const now = new Date().toISOString();
   const wordCount = input.content.split(/\s+/).filter(Boolean).length;
 
-  // Auto-assign index (max existing + 1)
-  const existingChapters = await db
-    .collection("novels")
-    .doc(novelId)
-    .collection("chapters")
-    .orderBy("index", "desc")
-    .limit(1)
-    .get();
+  // Use transaction to atomically assign index + create chapter + update counters
+  const result = await db.runTransaction(async (transaction) => {
+    const now = new Date().toISOString();
 
-  const nextIndex = existingChapters.empty ? 1 : (existingChapters.docs[0].data().index || 0) + 1;
+    // Auto-assign index (max existing + 1)
+    const existingChapters = await transaction.get(
+      db.collection("novels").doc(novelId).collection("chapters").orderBy("index", "desc").limit(1),
+    );
 
-  const chapterData = {
-    index: nextIndex,
-    title: input.title,
-    content: input.content,
-    word_count: wordCount,
-    access_type: input.access_type,
-    price: input.access_type === "paid" ? input.price || 0 : 0,
-    created_at: now,
-    updated_at: now,
-  };
+    const nextIndex = existingChapters.empty ? 1 : (existingChapters.docs[0].data().index || 0) + 1;
 
-  await db
-    .collection("novels")
-    .doc(novelId)
-    .collection("chapters")
-    .doc(String(nextIndex))
-    .set(chapterData);
+    const chapterData = {
+      index: nextIndex,
+      title: input.title,
+      content: input.content,
+      word_count: wordCount,
+      access_type: input.access_type,
+      price: input.access_type === "paid" ? input.price || 0 : 0,
+      created_at: now,
+      updated_at: now,
+    };
 
-  // Update novel counters
-  const novelRef = db.collection("novels").doc(novelId);
-  await novelRef.update({
-    chapter_count: admin.firestore.FieldValue.increment(1),
-    total_word_count: admin.firestore.FieldValue.increment(wordCount),
-    updated_at: now,
+    const chapterRef = db
+      .collection("novels")
+      .doc(novelId)
+      .collection("chapters")
+      .doc(String(nextIndex));
+    transaction.set(chapterRef, chapterData);
+
+    // Update novel counters
+    const novelRef = db.collection("novels").doc(novelId);
+    transaction.update(novelRef, {
+      chapter_count: admin.firestore.FieldValue.increment(1),
+      total_word_count: admin.firestore.FieldValue.increment(wordCount),
+      updated_at: now,
+    });
+
+    return { chapterData, nextIndex };
   });
 
-  logger.info("Chapter created", { novelId, index: nextIndex });
+  logger.info("Chapter created", { novelId, index: result.nextIndex });
 
-  return chapterDocToData(chapterData);
+  return chapterDocToData(result.chapterData);
 }
 
 export async function updateChapter(
@@ -208,9 +210,6 @@ export async function updateChapter(
   }
   if (input.access_type !== undefined) updates.access_type = input.access_type;
   if (input.price !== undefined) {
-    if (existing.access_type !== "paid" && input.access_type === undefined) {
-      throw new ValidationError("price can only be set for paid chapters");
-    }
     updates.price = input.price;
   }
 
