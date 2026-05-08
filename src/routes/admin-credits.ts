@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { topUp } from "../services/credit.js";
+import { listTopupHistory, topUp } from "../services/credit.js";
 import { ValidationError } from "../utils/errors.js";
 
 type Variables = {
@@ -18,6 +18,7 @@ adminCredits.use("/*", authMiddleware, adminMiddleware);
 // POST /api/admin/credits/topup
 adminCredits.post("/topup", async (c) => {
   const body = await c.req.json();
+  const adminUserId = c.get("userId") as string;
 
   if (!body.user_id || typeof body.user_id !== "string") {
     throw new ValidationError("user_id is required", { field: "user_id" });
@@ -28,7 +29,17 @@ adminCredits.post("/topup", async (c) => {
     });
   }
 
-  const result = await topUp(body.user_id, body.amount);
+  const result = await topUp(body.user_id, body.amount, adminUserId);
+  return c.json({ data: result }, 200);
+});
+
+// GET /api/admin/credits/history/:userId
+adminCredits.get("/history/:userId", async (c) => {
+  const targetUserId = c.req.param("userId");
+  const page = Number(c.req.query("page")) || 1;
+  const limit = Number(c.req.query("limit")) || 10;
+
+  const result = await listTopupHistory(targetUserId, page, limit);
   return c.json({ data: result }, 200);
 });
 

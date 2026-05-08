@@ -455,6 +455,20 @@
       "body": {}
     },
     {
+      "_id": "req_credits_history",
+      "_type": "request",
+      "parentId": "fld_credits",
+      "name": "Topup History",
+      "method": "GET",
+      "url": "{{ host }}/api/credits/history?page=1&limit=10",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
       "_id": "req_admin_credits_topup",
       "_type": "request",
       "parentId": "fld_admin_credits",
@@ -471,6 +485,20 @@
         "mimeType": "application/json",
         "text": "{\n  \"user_id\": \"<user_id>\",\n  \"amount\": 50\n}"
       }
+    },
+    {
+      "_id": "req_admin_credits_history",
+      "_type": "request",
+      "parentId": "fld_admin_credits",
+      "name": "User Topup History",
+      "method": "GET",
+      "url": "{{ host }}/api/admin/credits/history/<user_id>?page=1&limit=10",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
     }
   ]
 }
