@@ -1,3 +1,4 @@
+import { cors } from "hono/cors";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { requestLogger } from "./middleware/request-logger.js";
@@ -8,6 +9,13 @@ import { logger } from "./utils/logger.js";
 const app = new Hono();
 
 // Global middleware
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "http://localhost:3001"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 app.use(requestLogger);
 
 app.onError((err, c) => {
