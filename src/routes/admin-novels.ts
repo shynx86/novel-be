@@ -10,6 +10,7 @@ import {
 } from "../services/chapter.js";
 import { createNovel, deleteNovel, getNovel, listNovels, updateNovel } from "../services/novel.js";
 import { ValidationError } from "../utils/errors.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;
@@ -48,8 +49,7 @@ adminNovels.post("/", async (c) => {
 
 // GET /api/admin/novels
 adminNovels.get("/", async (c) => {
-  const page = Number(c.req.query("page")) || 1;
-  const limit = Number(c.req.query("limit")) || 20;
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
   const genre = c.req.query("genre");
   const status = c.req.query("status");
 
@@ -121,8 +121,7 @@ adminNovels.post("/:novelId/chapters", async (c) => {
 // GET /api/admin/novels/:novelId/chapters
 adminNovels.get("/:novelId/chapters", async (c) => {
   const novelId = c.req.param("novelId");
-  const page = Number(c.req.query("page")) || 1;
-  const limit = Number(c.req.query("limit")) || 100;
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 100);
 
   const result = await listChapters(novelId, {
     page,
