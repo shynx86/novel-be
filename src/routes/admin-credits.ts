@@ -3,6 +3,7 @@ import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { listTopupHistory, topUp } from "../services/credit.js";
 import { ValidationError } from "../utils/errors.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;
@@ -36,8 +37,7 @@ adminCredits.post("/topup", async (c) => {
 // GET /api/admin/credits/history/:userId
 adminCredits.get("/history/:userId", async (c) => {
   const targetUserId = c.req.param("userId");
-  const page = Number(c.req.query("page")) || 1;
-  const limit = Number(c.req.query("limit")) || 10;
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
 
   const result = await listTopupHistory(targetUserId, page, limit);
   return c.json({ data: result }, 200);

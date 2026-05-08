@@ -4,6 +4,7 @@ import { getChapter, listChapters } from "../services/chapter.js";
 import { getNovel, listNovels } from "../services/novel.js";
 import { checkSubscriptionAccess, getUserSubscriptionsForNovel } from "../services/subscription.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/errors.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;
@@ -14,8 +15,7 @@ const novels = new Hono<{ Variables: Variables }>();
 
 // GET /api/novels
 novels.get("/", async (c) => {
-  const page = Number(c.req.query("page")) || 1;
-  const limit = Number(c.req.query("limit")) || 20;
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
   const genre = c.req.query("genre");
   const status = c.req.query("status");
 
@@ -33,8 +33,7 @@ novels.get("/:novelId", async (c) => {
 // GET /api/novels/:novelId/chapters
 novels.get("/:novelId/chapters", optionalAuthMiddleware, async (c) => {
   const novelId = c.req.param("novelId");
-  const page = Number(c.req.query("page")) || 1;
-  const limit = Number(c.req.query("limit")) || 20;
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
 
   const result = await listChapters(novelId, { page, limit, includeContent: false });
 

@@ -7,6 +7,7 @@ import {
   subscribeNovel,
 } from "../services/subscription.js";
 import { ValidationError } from "../utils/errors.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;
@@ -78,8 +79,7 @@ subscriptions.post("/novel", async (c) => {
 // GET /api/subscriptions
 subscriptions.get("/", async (c) => {
   const userId = c.get("userId") as string;
-  const page = Number(c.req.query("page")) || 1;
-  const limit = Number(c.req.query("limit")) || 20;
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
 
   const result = await listUserSubscriptions(userId, { page, limit });
   return c.json({ data: result }, 200);
