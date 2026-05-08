@@ -72,6 +72,17 @@ export interface SubscriptionDocument {
   subscribed_at: string;
 }
 
+export interface CreditTransactionDocument {
+  id: string;
+  user_id: string;
+  type: "topup";
+  amount: number;
+  balance_before: number;
+  balance_after: number;
+  performed_by: string;
+  created_at: string;
+}
+
 export interface PaginatedResult<T> {
   items: T[];
   page: number;

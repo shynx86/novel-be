@@ -1,9 +1,12 @@
 import { jest } from "@jest/globals";
 import { app } from "../../src/app.js";
 import {
+  mockCountGet,
   mockDocGet,
+  mockQueryGet,
   mockRunTransaction,
   mockTransactionGet,
+  mockTransactionSet,
   mockTransactionUpdate,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
@@ -17,6 +20,28 @@ const mockAdminUser = {
   role: "admin",
   created_at: "2026-05-01T00:00:00.000Z",
   updated_at: "2026-05-01T00:00:00.000Z",
+};
+
+const mockTransaction1 = {
+  id: "tx-1",
+  user_id: "user-1",
+  type: "topup",
+  amount: 50,
+  balance_before: 100,
+  balance_after: 150,
+  performed_by: "admin-1",
+  created_at: "2026-05-08T10:00:00.000Z",
+};
+
+const mockTransaction2 = {
+  id: "tx-2",
+  user_id: "user-1",
+  type: "topup",
+  amount: 30,
+  balance_before: 150,
+  balance_after: 180,
+  performed_by: "admin-1",
+  created_at: "2026-05-08T12:00:00.000Z",
 };
 
 beforeEach(() => {
@@ -64,6 +89,36 @@ describe("GET /api/credits/balance", () => {
   });
 });
 
+// ─── GET /api/credits/history ─────────────────────────────────────────
+
+describe("GET /api/credits/history", () => {
+  it("returns 200 with paginated topup history", async () => {
+    mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 2 }) });
+    mockQueryGet.mockResolvedValue({
+      docs: [
+        { id: "tx-2", data: () => mockTransaction2 },
+        { id: "tx-1", data: () => mockTransaction1 },
+      ],
+    });
+
+    const res = await app.request("/api/credits/history?page=1&limit=10", {
+      headers: { Authorization: "Bearer valid-token" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.items).toHaveLength(2);
+    expect(body.data.total).toBe(2);
+    expect(body.data.items[0].amount).toBe(30);
+  });
+
+  it("returns 401 without auth", async () => {
+    const res = await app.request("/api/credits/history");
+    expect(res.status).toBe(401);
+  });
+});
+
 // ─── POST /api/admin/credits/topup ────────────────────────────────────
 
 describe("POST /api/admin/credits/topup", () => {
@@ -79,6 +134,7 @@ describe("POST /api/admin/credits/topup", () => {
       data: () => ({ credits: 100, role: "user" }),
     });
     mockTransactionUpdate.mockResolvedValue(undefined);
+    mockTransactionSet.mockResolvedValue(undefined);
 
     const res = await app.request("/api/admin/credits/topup", {
       method: "POST",
@@ -141,6 +197,47 @@ describe("POST /api/admin/credits/topup", () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ user_id: "user-2", amount: 50 }),
+    });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+// ─── GET /api/admin/credits/history/:userId ───────────────────────────
+
+describe("GET /api/admin/credits/history/:userId", () => {
+  function setupAdminAuth() {
+    mockVerifyIdToken.mockResolvedValue({ uid: "admin-1" });
+    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockAdminUser });
+  }
+
+  it("returns 200 with any user's topup history", async () => {
+    setupAdminAuth();
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 1 }) });
+    mockQueryGet.mockResolvedValue({
+      docs: [{ id: "tx-1", data: () => mockTransaction1 }],
+    });
+
+    const res = await app.request("/api/admin/credits/history/user-1?page=1&limit=10", {
+      headers: { Authorization: "Bearer admin-token" },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.items).toHaveLength(1);
+    expect(body.data.items[0].amount).toBe(50);
+    expect(body.data.items[0].performed_by).toBe("admin-1");
+  });
+
+  it("returns 403 for non-admin user", async () => {
+    mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
+    mockDocGet.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({ ...mockAdminUser, uid: "user-1", role: "user" }),
+    });
+
+    const res = await app.request("/api/admin/credits/history/user-2", {
+      headers: { Authorization: "Bearer user-token" },
     });
 
     expect(res.status).toBe(403);
