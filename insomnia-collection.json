@@ -1,0 +1,476 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-05-08T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.0",
+  "resources": [
+    {
+      "_id": "wrk_01",
+      "_type": "workspace",
+      "scope": "collection",
+      "name": "Novel BE",
+      "description": "Novel reading website backend API"
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_01",
+      "name": "Base Environment",
+      "data": {
+        "host": "http://localhost:3000",
+        "token": "",
+        "novel_id": "",
+        "chapter_index": "1"
+      },
+      "dataPropertyOrder": null,
+      "color": null,
+      "isPrivate": false
+    },
+    {
+      "_id": "fld_health",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Health"
+    },
+    {
+      "_id": "fld_auth",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Auth"
+    },
+    {
+      "_id": "fld_novels",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Novels"
+    },
+    {
+      "_id": "fld_admin_novels",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Admin - Novels"
+    },
+    {
+      "_id": "fld_admin_chapters",
+      "_type": "request_group",
+      "parentId": "fld_admin_novels",
+      "name": "Chapters"
+    },
+    {
+      "_id": "fld_subscriptions",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Subscriptions"
+    },
+    {
+      "_id": "fld_credits",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Credits"
+    },
+    {
+      "_id": "fld_admin_credits",
+      "_type": "request_group",
+      "parentId": "wrk_01",
+      "name": "Admin - Credits"
+    },
+    {
+      "_id": "req_health",
+      "_type": "request",
+      "parentId": "fld_health",
+      "name": "Health Check",
+      "method": "GET",
+      "url": "{{ host }}/api/health",
+      "headers": [],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_auth_register",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Register",
+      "method": "POST",
+      "url": "{{ host }}/api/auth/register",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\",\n  \"display_name\": \"Test User\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_login",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ host }}/api/auth/login",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_google",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Google Login",
+      "method": "POST",
+      "url": "{{ host }}/api/auth/google",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"id_token\": \"<google_id_token>\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_refresh",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Refresh Token",
+      "method": "POST",
+      "url": "{{ host }}/api/auth/refresh",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"refresh_token\": \"<refresh_token>\"\n}"
+      }
+    },
+    {
+      "_id": "req_auth_me",
+      "_type": "request",
+      "parentId": "fld_auth",
+      "name": "Get Profile",
+      "method": "GET",
+      "url": "{{ host }}/api/auth/me",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_novels_list",
+      "_type": "request",
+      "parentId": "fld_novels",
+      "name": "List Novels",
+      "method": "GET",
+      "url": "{{ host }}/api/novels?page=1&limit=10",
+      "headers": [],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_novels_get",
+      "_type": "request",
+      "parentId": "fld_novels",
+      "name": "Get Novel",
+      "method": "GET",
+      "url": "{{ host }}/api/novels/{{ novel_id }}",
+      "headers": [],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_novels_chapters",
+      "_type": "request",
+      "parentId": "fld_novels",
+      "name": "List Chapters",
+      "method": "GET",
+      "url": "{{ host }}/api/novels/{{ novel_id }}/chapters?page=1&limit=20",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_novels_chapter_get",
+      "_type": "request",
+      "parentId": "fld_novels",
+      "name": "Get Chapter",
+      "method": "GET",
+      "url": "{{ host }}/api/novels/{{ novel_id }}/chapters/{{ chapter_index }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_novels_list",
+      "_type": "request",
+      "parentId": "fld_admin_novels",
+      "name": "List Novels",
+      "method": "GET",
+      "url": "{{ host }}/api/admin/novels?page=1&limit=10",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_novels_create",
+      "_type": "request",
+      "parentId": "fld_admin_novels",
+      "name": "Create Novel",
+      "method": "POST",
+      "url": "{{ host }}/api/admin/novels",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"My Novel\",\n  \"author\": \"Author Name\",\n  \"description\": \"A great novel\",\n  \"genre\": [\"Fantasy\", \"Adventure\"],\n  \"status\": \"ongoing\",\n  \"price\": 100\n}"
+      }
+    },
+    {
+      "_id": "req_admin_novels_get",
+      "_type": "request",
+      "parentId": "fld_admin_novels",
+      "name": "Get Novel",
+      "method": "GET",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_novels_update",
+      "_type": "request",
+      "parentId": "fld_admin_novels",
+      "name": "Update Novel",
+      "method": "PATCH",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Updated Title\",\n  \"price\": 150\n}"
+      }
+    },
+    {
+      "_id": "req_admin_novels_delete",
+      "_type": "request",
+      "parentId": "fld_admin_novels",
+      "name": "Delete Novel",
+      "method": "DELETE",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_chapters_list",
+      "_type": "request",
+      "parentId": "fld_admin_chapters",
+      "name": "List Chapters",
+      "method": "GET",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}/chapters?page=1&limit=20",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_chapters_create",
+      "_type": "request",
+      "parentId": "fld_admin_chapters",
+      "name": "Create Chapter",
+      "method": "POST",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}/chapters",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Chapter 1\",\n  \"content\": \"Once upon a time...\",\n  \"access_type\": \"free\",\n  \"price\": 0\n}"
+      }
+    },
+    {
+      "_id": "req_admin_chapters_get",
+      "_type": "request",
+      "parentId": "fld_admin_chapters",
+      "name": "Get Chapter",
+      "method": "GET",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}/chapters/{{ chapter_index }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_chapters_update",
+      "_type": "request",
+      "parentId": "fld_admin_chapters",
+      "name": "Update Chapter",
+      "method": "PATCH",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}/chapters/{{ chapter_index }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"title\": \"Updated Title\",\n  \"content\": \"Updated content...\",\n  \"access_type\": \"paid\",\n  \"price\": 10\n}"
+      }
+    },
+    {
+      "_id": "req_admin_chapters_delete",
+      "_type": "request",
+      "parentId": "fld_admin_chapters",
+      "name": "Delete Chapter",
+      "method": "DELETE",
+      "url": "{{ host }}/api/admin/novels/{{ novel_id }}/chapters/{{ chapter_index }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_sub_chapter",
+      "_type": "request",
+      "parentId": "fld_subscriptions",
+      "name": "Subscribe to Chapter",
+      "method": "POST",
+      "url": "{{ host }}/api/subscriptions/chapter",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"novel_id\": \"{{ novel_id }}\",\n  \"chapter_index\": 3\n}"
+      }
+    },
+    {
+      "_id": "req_sub_novel",
+      "_type": "request",
+      "parentId": "fld_subscriptions",
+      "name": "Subscribe to Novel",
+      "method": "POST",
+      "url": "{{ host }}/api/subscriptions/novel",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"novel_id\": \"{{ novel_id }}\"\n}"
+      }
+    },
+    {
+      "_id": "req_sub_list",
+      "_type": "request",
+      "parentId": "fld_subscriptions",
+      "name": "List Subscriptions",
+      "method": "GET",
+      "url": "{{ host }}/api/subscriptions?page=1&limit=10",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_sub_check",
+      "_type": "request",
+      "parentId": "fld_subscriptions",
+      "name": "Check Access",
+      "method": "GET",
+      "url": "{{ host }}/api/subscriptions/check/{{ novel_id }}/{{ chapter_index }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_credits_balance",
+      "_type": "request",
+      "parentId": "fld_credits",
+      "name": "Get Balance",
+      "method": "GET",
+      "url": "{{ host }}/api/credits/balance",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {}
+    },
+    {
+      "_id": "req_admin_credits_topup",
+      "_type": "request",
+      "parentId": "fld_admin_credits",
+      "name": "Top Up Credits",
+      "method": "POST",
+      "url": "{{ host }}/api/admin/credits/topup",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "parameters": [],
+      "authentication": {},
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"user_id\": \"<user_id>\",\n  \"amount\": 50\n}"
+      }
+    }
+  ]
+}
