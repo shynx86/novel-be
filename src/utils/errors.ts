@@ -33,7 +33,25 @@ export class UnauthorizedError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = "Forbidden") {
+  public readonly details?: unknown;
+
+  constructor(message = "Forbidden", details?: unknown) {
     super(403, message, "FORBIDDEN");
+    this.details = details;
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message = "Conflict") {
+    super(409, message, "CONFLICT");
+  }
+}
+
+export class PaymentRequiredError extends AppError {
+  public readonly details?: unknown;
+
+  constructor(message = "Payment required", details?: unknown) {
+    super(402, message, "INSUFFICIENT_CREDITS");
+    this.details = details;
   }
 }

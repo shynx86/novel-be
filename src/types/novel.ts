@@ -1,0 +1,80 @@
+export type NovelStatus = "ongoing" | "completed" | "hiatus";
+export type ChapterAccessType = "free" | "free_auth" | "paid";
+export type SubscriptionType = "chapter" | "novel";
+
+export interface NovelDocument {
+  id: string;
+  title: string;
+  description: string;
+  author: string;
+  cover_url: string;
+  genre: string[];
+  status: NovelStatus;
+  chapter_count: number;
+  total_word_count: number;
+  price: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NovelCreateInput {
+  title: string;
+  description?: string;
+  author: string;
+  cover_url?: string;
+  genre?: string[];
+  status?: NovelStatus;
+  price?: number | null;
+}
+
+export interface NovelUpdateInput {
+  title?: string;
+  description?: string;
+  author?: string;
+  cover_url?: string;
+  genre?: string[];
+  status?: NovelStatus;
+  price?: number | null;
+}
+
+export interface ChapterDocument {
+  index: number;
+  title: string;
+  content: string;
+  word_count: number;
+  access_type: ChapterAccessType;
+  price: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChapterCreateInput {
+  title: string;
+  content: string;
+  access_type: ChapterAccessType;
+  price?: number;
+}
+
+export interface ChapterUpdateInput {
+  title?: string;
+  content?: string;
+  access_type?: ChapterAccessType;
+  price?: number;
+}
+
+export interface SubscriptionDocument {
+  id: string;
+  user_id: string;
+  novel_id: string;
+  chapter_index: number;
+  type: SubscriptionType;
+  credits_paid: number;
+  subscribed_at: string;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+}

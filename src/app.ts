@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { requestLogger } from "./middleware/request-logger.js";
 import { registerRoutes } from "./routes/index.js";
-import { AppError, ValidationError } from "./utils/errors.js";
+import { AppError, ForbiddenError, PaymentRequiredError, ValidationError } from "./utils/errors.js";
 import { logger } from "./utils/logger.js";
 
 const app = new Hono();
@@ -17,6 +17,8 @@ app.onError((err, c) => {
       VALIDATION_ERROR: 400,
       UNAUTHORIZED: 401,
       FORBIDDEN: 403,
+      CONFLICT: 409,
+      INSUFFICIENT_CREDITS: 402,
     };
 
     logger.warn("AppError", {
@@ -33,7 +35,11 @@ app.onError((err, c) => {
         error: {
           code: err.code,
           message: err.message,
-          ...(err instanceof ValidationError && { details: err.details }),
+          ...((err instanceof ValidationError ||
+            err instanceof PaymentRequiredError ||
+            err instanceof ForbiddenError) && {
+            details: err.details,
+          }),
         },
       },
       statusCode,

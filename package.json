@@ -9,6 +9,7 @@
     "dev": "node --env-file=.env --import tsx/esm adapters/standalone/index.ts",
     "serve": "firebase emulators:start",
     "deploy": "firebase deploy --only functions",
+    "deploy:indexes": "firebase deploy --only firestore:indexes",
     "test": "node --experimental-vm-modules node_modules/.bin/jest",
     "lint": "biome check src/ adapters/ tests/",
     "format": "biome format --write src/ adapters/ tests/",

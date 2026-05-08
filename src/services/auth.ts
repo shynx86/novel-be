@@ -9,6 +9,8 @@ export interface UserDocument {
   email: string;
   display_name: string;
   avatar_url: string;
+  credits: number;
+  role: "user" | "admin";
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +43,8 @@ function buildUserDoc(
     email: data.email,
     display_name: data.display_name || `user_${uid}`,
     avatar_url: data.avatar_url || "",
+    credits: 0,
+    role: "user",
     created_at: now,
     updated_at: now,
   };
