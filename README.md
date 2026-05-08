@@ -74,7 +74,7 @@ Emulator UI at `http://localhost:4000`.
 
 ## API Endpoints
 
-All routes are prefixed with `/api/`.
+All routes are prefixed with `/api/`. List endpoints support `page` and `limit` query params (max limit: 100).
 
 ### Auth (`/api/auth`)
 
@@ -91,6 +91,57 @@ All routes are prefixed with `/api/`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/health` | No | Health check |
+
+### Novels (`/api/novels`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/` | No | List novels (supports `genre`, `status` filters) |
+| GET | `/:novelId` | No | Get novel detail |
+| GET | `/:novelId/chapters` | Optional | List chapters (annotated with `is_subscribed` if authenticated) |
+| GET | `/:novelId/chapters/:index` | Optional | Read chapter (access controlled by `access_type`) |
+
+### Subscriptions (`/api/subscriptions`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/chapter` | Yes | Subscribe to a chapter (deducts credits) |
+| POST | `/novel` | Yes | Subscribe to a whole novel (deducts credits) |
+| GET | `/` | Yes | List user's subscriptions |
+| GET | `/check/:novelId/:index` | Yes | Check access to a chapter |
+
+### Credits (`/api/credits`)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/balance` | Yes | Get credit balance |
+| GET | `/history` | Yes | Get topup history |
+
+### Admin — Novels (`/api/admin/novels`)
+
+All admin routes require authentication + admin role.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/` | Create novel |
+| GET | `/` | List novels |
+| GET | `/:novelId` | Get novel detail |
+| PATCH | `/:novelId` | Update novel |
+| DELETE | `/:novelId` | Delete novel |
+| POST | `/:novelId/chapters` | Create chapter |
+| GET | `/:novelId/chapters` | List chapters (with content) |
+| GET | `/:novelId/chapters/:index` | Get chapter |
+| PATCH | `/:novelId/chapters/:index` | Update chapter |
+| DELETE | `/:novelId/chapters/:index` | Delete chapter |
+
+### Admin — Credits (`/api/admin/credits`)
+
+All admin routes require authentication + admin role.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/topup` | Top up user credits |
+| GET | `/history/:userId` | Get user's topup history |
 
 ## Deploy
 

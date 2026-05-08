@@ -21,18 +21,31 @@ src/
   config/env.ts       # Environment variables and configuration
   middleware/
     auth.ts           # Firebase Auth middleware (JWT verification via shared firebase.ts)
+    optional-auth.ts  # Optional auth — silently ignores invalid tokens (for public content)
+    admin.ts          # Admin role verification (checks user.role === "admin" in Firestore)
     error-handler.ts  # Global error handling
     request-logger.ts # Request logging with unique request IDs
   routes/
     index.ts          # Route registration (all under /api/)
     auth.ts           # Auth routes: register, login, google, refresh, me
     health.ts         # Health check endpoint
+    novels.ts         # Public novel/chapter browsing (list, detail, chapters, read)
+    subscriptions.ts  # User subscriptions (subscribe chapter/novel, list, check access)
+    credits.ts        # User credits (balance, topup history)
+    admin-novels.ts   # Admin novel/chapter CRUD
+    admin-credits.ts  # Admin credit management (topup, history)
   services/
     auth.ts           # Auth business logic (token exchange, user management)
     firebase.ts       # Shared Firebase Admin singleton (getAdminApp, getAuth, getFirestore)
     health.ts         # Health check service (Firestore connectivity test)
+    novel.ts          # Novel CRUD operations
+    chapter.ts        # Chapter CRUD operations with auto-indexing
+    subscription.ts   # Subscription management with credit deduction (atomic Firestore transactions)
+    credit.ts         # Credit balance and transaction management
+  types/
+    novel.ts          # TypeScript interfaces (NovelDocument, ChapterDocument, SubscriptionDocument, etc.)
   utils/
-    errors.ts         # Custom error classes (AppError, NotFoundError, UnauthorizedError, etc.)
+    errors.ts         # Custom error classes (AppError, NotFoundError, UnauthorizedError, ForbiddenError, ValidationError, etc.)
     logger.ts         # Structured JSON logger
 adapters/
   firebase/index.ts   # Firebase Cloud Functions adapter (wraps Hono with onRequest)
@@ -40,7 +53,7 @@ adapters/
 tests/
   setup.ts            # Test setup and utilities
   __mocks__/          # Module mocks (firebase-admin, config/env)
-  routes/             # Route tests
+  routes/             # Route tests (health, auth, novels, subscriptions, credits, admin-novels)
 firebase/             # Firebase config (firestore rules, storage rules, indexes)
 docs/                 # Documentation
 ```
@@ -72,6 +85,8 @@ Both import the same Hono app from `src/app.ts`.
 - Success response format: `{ data: ... }`
 - Each request gets a unique `X-Request-Id` header
 - Middleware chain: request logger → routes → error handler
+- All list endpoints support pagination with `page` and `limit` query params (max limit: 100)
+- Paginated responses: `{ data: { items: [], page, limit, total } }`
 
 ## Auth architecture
 
@@ -83,6 +98,25 @@ Both import the same Hono app from `src/app.ts`.
 - **Firestore user docs**: Stored in `users` collection, keyed by Firebase Auth UID. `getOrCreateUserDocument` uses `set({ merge: true })` to handle concurrent requests safely
 - **Google OAuth**: Client-side flow — frontend sends Google ID token to backend, backend verifies via Firebase Admin
 - **Protected routes**: `authMiddleware` verifies ID token via `getAuth().verifyIdToken()`
+- **Optional auth**: `optionalAuthMiddleware` sets user context if token is valid, silently proceeds otherwise
+- **Admin routes**: `adminMiddleware` checks `user.role === "admin"` in Firestore, returns 403 if not admin
+
+## Novel & chapter system
+
+- **Firestore collections**: `novels` (top-level), `novels/{novelId}/chapters` (sub-collection)
+- **Chapters**: Auto-indexed (server assigns next index on create), tracked by `chapter_count` and `total_word_count` on novel doc
+- **Access types**: `free` (public), `free_auth` (authenticated users), `paid` (subscription required)
+- **Chapter listing**: Content excluded by default for performance (`includeContent: false` for public, `true` for admin)
+- **Subscription annotation**: Chapter lists for authenticated users include `is_subscribed` field based on user's subscriptions
+
+## Subscription & credit system
+
+- **Subscription types**: Per-chapter (`chapter`) or whole-novel (`novel`)
+- **Firestore collection**: `subscriptions` with composite fields (`user_id`, `novel_id`, `chapter_index`, `type`)
+- **Credit deduction**: Atomic Firestore transactions — deduct credits + create subscription in one transaction
+- **Insufficient credits**: Returns 402 with `INSUFFICIENT_CREDITS` error code
+- **Credit transactions**: Logged in `credit_transactions` collection with `balance_before`/`balance_after` snapshots
+- **Admin topup**: Admins can top up user credits via `/api/admin/credits/topup`
 
 ## Testing conventions
 
