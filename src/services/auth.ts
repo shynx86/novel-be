@@ -304,3 +304,20 @@ export async function getUserProfile(uid: string): Promise<UserDocument> {
   }
   return user;
 }
+
+export async function updateUserProfile(
+  uid: string,
+  input: { display_name?: string; avatar_url?: string },
+): Promise<UserDocument> {
+  const db = getFirestore();
+  const now = new Date().toISOString();
+
+  const updates: Record<string, unknown> = { updated_at: now };
+  if (input.display_name !== undefined) updates.display_name = input.display_name;
+  if (input.avatar_url !== undefined) updates.avatar_url = input.avatar_url;
+
+  await db.collection("users").doc(uid).update(updates);
+  logger.info("User profile updated", { uid });
+
+  return (await getUserDocument(uid))!;
+}

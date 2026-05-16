@@ -12,6 +12,7 @@ import { getFirestore } from "./firebase.js";
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
     id,
+    slug: data.slug || id,
     title: data.title,
     description: data.description,
     author: data.author,
@@ -20,6 +21,10 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     status: data.status,
     chapter_count: data.chapter_count || 0,
     total_word_count: data.total_word_count || 0,
+    rating: data.rating ?? 0,
+    views: data.views ?? 0,
+    followers: data.followers ?? 0,
+    comment_count: data.comment_count ?? 0,
     price: data.price ?? null,
     created_at: data.created_at,
     updated_at: data.updated_at,
@@ -31,6 +36,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
   const now = new Date().toISOString();
 
   const docData = {
+    slug: input.slug,
     title: input.title,
     description: input.description || "",
     author: input.author,
@@ -39,6 +45,10 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     status: input.status || "ongoing",
     chapter_count: 0,
     total_word_count: 0,
+    rating: input.rating ?? 0,
+    views: input.views ?? 0,
+    followers: input.followers ?? 0,
+    comment_count: 0,
     price: input.price !== undefined ? input.price : null,
     created_at: now,
     updated_at: now,
@@ -61,6 +71,49 @@ export async function getNovel(novelId: string): Promise<NovelDocument> {
   const data = doc.data();
   if (!data) throw new NotFoundError("Novel not found");
   return novelDocToData(doc.id, data);
+}
+
+export async function getNovelBySlug(slug: string): Promise<NovelDocument> {
+  const db = getFirestore();
+  const snapshot = await db.collection("novels").where("slug", "==", slug).limit(1).get();
+
+  if (snapshot.empty) {
+    throw new NotFoundError("Novel not found");
+  }
+
+  const doc = snapshot.docs[0];
+  return novelDocToData(doc.id, doc.data());
+}
+
+export async function listNovelsForSitemap(): Promise<
+  { id: string; slug: string; chapter_count: number; updated_at: string }[]
+> {
+  const db = getFirestore();
+  const snapshot = await db.collection("novels").select("slug", "chapter_count", "updated_at").get();
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    slug: doc.data().slug || doc.id,
+    chapter_count: doc.data().chapter_count || 0,
+    updated_at: doc.data().updated_at,
+  }));
+}
+
+export async function getTrendingNovels(limit = 10): Promise<NovelDocument[]> {
+  const db = getFirestore();
+  const snapshot = await db.collection("novels").orderBy("views", "desc").limit(limit).get();
+  return snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+}
+
+export async function getCompletedNovels(limit = 10): Promise<NovelDocument[]> {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection("novels")
+    .where("status", "==", "completed")
+    .orderBy("updated_at", "desc")
+    .limit(limit)
+    .get();
+  return snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
 }
 
 export async function listNovels(params: {
@@ -110,12 +163,16 @@ export async function updateNovel(
   const now = new Date().toISOString();
 
   const updates: Record<string, unknown> = { updated_at: now };
+  if (input.slug !== undefined) updates.slug = input.slug;
   if (input.title !== undefined) updates.title = input.title;
   if (input.description !== undefined) updates.description = input.description;
   if (input.author !== undefined) updates.author = input.author;
   if (input.cover_url !== undefined) updates.cover_url = input.cover_url;
   if (input.genre !== undefined) updates.genre = input.genre;
   if (input.status !== undefined) updates.status = input.status;
+  if (input.rating !== undefined) updates.rating = input.rating;
+  if (input.views !== undefined) updates.views = input.views;
+  if (input.followers !== undefined) updates.followers = input.followers;
   if (input.price !== undefined) updates.price = input.price;
 
   await db.collection("novels").doc(novelId).update(updates);
