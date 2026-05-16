@@ -4,6 +4,7 @@ export type SubscriptionType = "chapter" | "novel";
 
 export interface NovelDocument {
   id: string;
+  slug: string;
   title: string;
   description: string;
   author: string;
@@ -12,28 +13,40 @@ export interface NovelDocument {
   status: NovelStatus;
   chapter_count: number;
   total_word_count: number;
+  rating: number;
+  views: number;
+  followers: number;
+  comment_count: number;
   price: number | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface NovelCreateInput {
+  slug: string;
   title: string;
   description?: string;
   author: string;
   cover_url?: string;
   genre?: string[];
   status?: NovelStatus;
+  rating?: number;
+  views?: number;
+  followers?: number;
   price?: number | null;
 }
 
 export interface NovelUpdateInput {
+  slug?: string;
   title?: string;
   description?: string;
   author?: string;
   cover_url?: string;
   genre?: string[];
   status?: NovelStatus;
+  rating?: number;
+  views?: number;
+  followers?: number;
   price?: number | null;
 }
 

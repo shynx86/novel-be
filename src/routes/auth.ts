@@ -6,6 +6,7 @@ import {
   loginWithGoogle,
   refreshIdToken,
   registerWithEmail,
+  updateUserProfile,
 } from "../services/auth.js";
 import { ValidationError } from "../utils/errors.js";
 
@@ -91,6 +92,15 @@ auth.post("/refresh", async (c) => {
 auth.get("/me", authMiddleware, async (c) => {
   const userId = c.get("userId") as string;
   const user = await getUserProfile(userId);
+  return c.json({ data: user }, 200);
+});
+
+// PATCH /api/auth/me (protected)
+auth.patch("/me", authMiddleware, async (c) => {
+  const userId = c.get("userId") as string;
+  const body = await c.req.json<{ display_name?: string; avatar_url?: string }>();
+
+  const user = await updateUserProfile(userId, body);
   return c.json({ data: user }, 200);
 });
 
