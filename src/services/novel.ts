@@ -8,6 +8,7 @@ import type {
 import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
+import { getGenreBySlug } from "./genre.js";
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
@@ -97,6 +98,29 @@ export async function listNovelsForSitemap(): Promise<
     chapter_count: doc.data().chapter_count || 0,
     updated_at: doc.data().updated_at,
   }));
+}
+
+export async function getRelatedNovels(
+  novelId: string,
+  genreIndex = 0,
+  limit = 10,
+): Promise<NovelDocument[]> {
+  const novel = await getNovel(novelId);
+  const genre = novel.genre[genreIndex];
+  if (!genre) return [];
+
+  const db = getFirestore();
+  const snapshot = await db
+    .collection("novels")
+    .where("genre", "array-contains", genre)
+    .orderBy("updated_at", "desc")
+    .limit(limit + 1)
+    .get();
+
+  return snapshot.docs
+    .map((doc) => novelDocToData(doc.id, doc.data()))
+    .filter((n) => n.id !== novelId)
+    .slice(0, limit);
 }
 
 export async function getTrendingNovels(limit = 10): Promise<NovelDocument[]> {

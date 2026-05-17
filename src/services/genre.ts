@@ -17,6 +17,14 @@ function genreDocToData(id: string, data: admin.firestore.DocumentData): GenreDo
   };
 }
 
+export async function getGenreBySlug(slug: string): Promise<GenreDocument | null> {
+  const db = getFirestore();
+  const snapshot = await db.collection("genres").where("slug", "==", slug).limit(1).get();
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return genreDocToData(doc.id, doc.data());
+}
+
 export async function listGenres(): Promise<GenreDocument[]> {
   const db = getFirestore();
 

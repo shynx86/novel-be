@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
-import { env } from "./src/config/env.js";
+
+const PROJECT_ID = process.env.PROJECT_ID || "novel-ecbcc";
 
 const genres = [
   { name: "Tiên Hiệp", slug: "tien-hiep" },
@@ -36,7 +37,7 @@ const genres = [
 
 async function seed() {
   admin.initializeApp({
-    projectId: env.projectId || undefined,
+    projectId: PROJECT_ID,
   });
 
   const db = admin.firestore();
