@@ -40,6 +40,7 @@ export const api = onRequest(
     timeoutSeconds: 60,
     minInstances: 0,
     maxInstances: 100,
+    invoker: "public",
   },
   handler,
 );
