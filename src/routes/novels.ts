@@ -7,6 +7,7 @@ import {
   getCompletedNovels,
   getNovel,
   getNovelBySlug,
+  getRelatedNovels,
   getTrendingNovels,
   listNovels,
   listNovelsForSitemap,
@@ -65,6 +66,15 @@ novels.get("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
   const novel = await getNovel(novelId);
   return c.json({ data: novel }, 200);
+});
+
+// GET /api/novels/:novelId/related
+novels.get("/:novelId/related", async (c) => {
+  const novelId = c.req.param("novelId");
+  const genreIndex = Math.max(0, Number(c.req.query("genre_index") || 0));
+  const limit = Math.min(Number(c.req.query("limit") || 10), 50);
+  const result = await getRelatedNovels(novelId, genreIndex, limit);
+  return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/:novelId/chapters
