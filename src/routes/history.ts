@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
-import { listReadingHistory, removeFromHistory, updateReadingProgress } from "../services/history.js";
+import {
+  listReadingHistory,
+  removeFromHistory,
+  updateReadingProgress,
+} from "../services/history.js";
 import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
@@ -26,7 +30,10 @@ history.post("/:novelId", authMiddleware, async (c) => {
   const body = await c.req.json();
 
   if (typeof body.chapterIndex !== "number" || body.chapterIndex < 1) {
-    return c.json({ error: { code: "VALIDATION_ERROR", message: "chapterIndex must be a positive number" } }, 400);
+    return c.json(
+      { error: { code: "VALIDATION_ERROR", message: "chapterIndex must be a positive number" } },
+      400,
+    );
   }
 
   const result = await updateReadingProgress(userId, novelId, body.chapterIndex);

@@ -70,12 +70,7 @@ export async function listFavorites(
     .offset((page - 1) * limit)
     .get();
 
-  const totalCount = await db
-    .collection("users")
-    .doc(userId)
-    .collection("favorites")
-    .count()
-    .get();
+  const totalCount = await db.collection("users").doc(userId).collection("favorites").count().get();
 
   const total = totalCount.data().count;
 

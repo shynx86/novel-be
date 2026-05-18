@@ -90,7 +90,10 @@ export async function listNovelsForSitemap(): Promise<
   { id: string; slug: string; chapter_count: number; updated_at: string }[]
 > {
   const db = getFirestore();
-  const snapshot = await db.collection("novels").select("slug", "chapter_count", "updated_at").get();
+  const snapshot = await db
+    .collection("novels")
+    .select("slug", "chapter_count", "updated_at")
+    .get();
 
   return snapshot.docs.map((doc) => ({
     id: doc.id,

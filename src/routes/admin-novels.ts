@@ -35,7 +35,12 @@ adminNovels.post("/", async (c) => {
   }
 
   const novel = await createNovel({
-    slug: body.slug || body.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+    slug:
+      body.slug ||
+      body.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, ""),
     title: body.title,
     description: body.description,
     author: body.author,

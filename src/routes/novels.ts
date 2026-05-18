@@ -1,8 +1,8 @@
-import { Hono } from "hono";
 import type admin from "firebase-admin";
+import { Hono } from "hono";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
 import { getChapter, listChapters } from "../services/chapter.js";
-import { comments } from "./comments.js";
+import { getFirestore } from "../services/firebase.js";
 import {
   getCompletedNovels,
   getNovel,
@@ -12,10 +12,10 @@ import {
   listNovels,
   listNovelsForSitemap,
 } from "../services/novel.js";
-import { getFirestore } from "../services/firebase.js";
 import { checkSubscriptionAccess, getUserSubscriptionsForNovel } from "../services/subscription.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
+import { comments } from "./comments.js";
 
 type Variables = {
   user: unknown;
@@ -146,9 +146,12 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
 novels.post("/:novelId/views", async (c) => {
   const novelId = c.req.param("novelId");
   const db = getFirestore();
-  await db.collection("novels").doc(novelId).update({
-    views: (await import("firebase-admin")).default.firestore.FieldValue.increment(1),
-  });
+  await db
+    .collection("novels")
+    .doc(novelId)
+    .update({
+      views: (await import("firebase-admin")).default.firestore.FieldValue.increment(1),
+    });
   return c.json({ data: { success: true } }, 200);
 });
 

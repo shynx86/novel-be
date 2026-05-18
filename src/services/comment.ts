@@ -66,9 +66,12 @@ export async function createComment(
   const ref = await db.collection("novels").doc(novelId).collection("comments").add(docData);
 
   // Increment comment count on novel
-  await db.collection("novels").doc(novelId).update({
-    comment_count: admin.firestore.FieldValue.increment(1),
-  });
+  await db
+    .collection("novels")
+    .doc(novelId)
+    .update({
+      comment_count: admin.firestore.FieldValue.increment(1),
+    });
 
   logger.info("Comment created", { novelId, commentId: ref.id, userId });
 
@@ -112,9 +115,10 @@ export async function listComments(
   }
 
   for (const comment of allComments) {
-    const node = commentMap.get(comment.id)!;
+    const node = commentMap.get(comment.id);
+    if (!node) continue;
     if (comment.parent_id && commentMap.has(comment.parent_id)) {
-      commentMap.get(comment.parent_id)!.replies.push(node);
+      commentMap.get(comment.parent_id)?.replies.push(node);
     } else {
       rootComments.push(node);
     }
@@ -144,17 +148,17 @@ export async function deleteComment(
   await docRef.delete();
 
   // Decrement comment count on novel
-  await db.collection("novels").doc(novelId).update({
-    comment_count: admin.firestore.FieldValue.increment(-1),
-  });
+  await db
+    .collection("novels")
+    .doc(novelId)
+    .update({
+      comment_count: admin.firestore.FieldValue.increment(-1),
+    });
 
   logger.info("Comment deleted", { novelId, commentId, userId });
 }
 
-export async function likeComment(
-  novelId: string,
-  commentId: string,
-): Promise<CommentDocument> {
+export async function likeComment(novelId: string, commentId: string): Promise<CommentDocument> {
   const db = getFirestore();
   const docRef = db.collection("novels").doc(novelId).collection("comments").doc(commentId);
   const doc = await docRef.get();
@@ -168,5 +172,9 @@ export async function likeComment(
   });
 
   const updated = await docRef.get();
-  return commentDocToData(updated.id, updated.data()!, novelId);
+  const updatedData = updated.data();
+  if (!updatedData) {
+    throw new NotFoundError("Comment not found");
+  }
+  return commentDocToData(updated.id, updatedData, novelId);
 }

@@ -27,7 +27,10 @@ export async function updateReadingProgress(
   const now = new Date().toISOString();
 
   if (existing.exists) {
-    const data = existing.data()!;
+    const data = existing.data();
+    if (!data) {
+      throw new NotFoundError("Reading history not found");
+    }
     const readChapters = data.read_chapters || [];
     if (!readChapters.includes(chapterIndex)) {
       readChapters.push(chapterIndex);

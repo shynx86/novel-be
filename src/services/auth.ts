@@ -319,5 +319,9 @@ export async function updateUserProfile(
   await db.collection("users").doc(uid).update(updates);
   logger.info("User profile updated", { uid });
 
-  return (await getUserDocument(uid))!;
+  const user = await getUserDocument(uid);
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+  return user;
 }
