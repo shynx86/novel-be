@@ -1,12 +1,13 @@
 import { Hono } from "hono";
-import { dashboardAuthMiddleware } from "../middleware/dashboard-auth.js";
+import { adminMiddleware } from "../middleware/admin.js";
+import { authMiddleware } from "../middleware/auth.js";
 import { createGenre, deleteGenre, listGenresAdmin, updateGenre } from "../services/genre-admin.js";
 import { ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
 const adminGenres = new Hono();
 
-adminGenres.use("/*", dashboardAuthMiddleware);
+adminGenres.use("/*", authMiddleware, adminMiddleware);
 
 adminGenres.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);

@@ -1,11 +1,12 @@
 import { Hono } from "hono";
-import { dashboardAuthMiddleware } from "../middleware/dashboard-auth.js";
+import { adminMiddleware } from "../middleware/admin.js";
+import { authMiddleware } from "../middleware/auth.js";
 import { deleteUser, getUser, listUsers, updateUser } from "../services/user-admin.js";
 import { parsePagination } from "../utils/pagination.js";
 
 const adminUsers = new Hono();
 
-adminUsers.use("/*", dashboardAuthMiddleware);
+adminUsers.use("/*", authMiddleware, adminMiddleware);
 
 adminUsers.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { dashboardAuthMiddleware } from "../middleware/dashboard-auth.js";
+import { adminMiddleware } from "../middleware/admin.js";
+import { authMiddleware } from "../middleware/auth.js";
 import { listTopupHistory, topUp } from "../services/credit.js";
 import { ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
@@ -12,7 +13,7 @@ type Variables = {
 
 const adminCredits = new Hono<{ Variables: Variables }>();
 
-adminCredits.use("/*", dashboardAuthMiddleware);
+adminCredits.use("/*", authMiddleware, adminMiddleware);
 
 // POST /api/admin/credits/topup
 adminCredits.post("/topup", async (c) => {

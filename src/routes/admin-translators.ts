@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { dashboardAuthMiddleware } from "../middleware/dashboard-auth.js";
+import { adminMiddleware } from "../middleware/admin.js";
+import { authMiddleware } from "../middleware/auth.js";
 import {
   createTranslator,
   deleteTranslator,
@@ -12,7 +13,7 @@ import { parsePagination } from "../utils/pagination.js";
 
 const adminTranslators = new Hono();
 
-adminTranslators.use("/*", dashboardAuthMiddleware);
+adminTranslators.use("/*", authMiddleware, adminMiddleware);
 
 adminTranslators.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
