@@ -96,6 +96,124 @@ export interface CreditTransactionDocument {
   created_at: string;
 }
 
+export type AdPosition = "header" | "sidebar" | "footer" | "inline";
+
+export interface AdDocument {
+  id: string;
+  title: string;
+  image_url: string;
+  link_url: string;
+  position: AdPosition;
+  is_active: boolean;
+  display_order: number;
+  start_date: string | null;
+  end_date: string | null;
+  click_count: number;
+  impression_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdCreateInput {
+  title: string;
+  image_url: string;
+  link_url: string;
+  position: AdPosition;
+  is_active?: boolean;
+  display_order?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+export interface AdUpdateInput {
+  title?: string;
+  image_url?: string;
+  link_url?: string;
+  position?: AdPosition;
+  is_active?: boolean;
+  display_order?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+export interface AuthorDocument {
+  id: string;
+  name: string;
+  slug: string;
+  bio: string;
+  avatar_url: string;
+  novel_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthorCreateInput {
+  name: string;
+  slug?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
+export interface AuthorUpdateInput {
+  name?: string;
+  slug?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
+export interface TranslatorDocument {
+  id: string;
+  name: string;
+  slug: string;
+  bio: string;
+  avatar_url: string;
+  novel_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TranslatorCreateInput {
+  name: string;
+  slug?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
+export interface TranslatorUpdateInput {
+  name?: string;
+  slug?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
+export interface GenreDocument {
+  id: string;
+  name: string;
+  slug: string;
+  novel_count: number;
+}
+
+export interface GenreCreateInput {
+  name: string;
+  slug?: string;
+}
+
+export interface GenreUpdateInput {
+  name?: string;
+  slug?: string;
+}
+
+export interface UserDocument {
+  uid: string;
+  email: string;
+  display_name: string;
+  avatar_url: string;
+  credits: number;
+  role: "user" | "admin";
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PaginatedResult<T> {
   items: T[];
   page: number;
