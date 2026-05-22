@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { dashboardAuthMiddleware } from "../middleware/dashboard-auth.js";
+import { adminMiddleware } from "../middleware/admin.js";
+import { authMiddleware } from "../middleware/auth.js";
 import {
   createChapter,
   deleteChapter,
@@ -19,7 +20,7 @@ type Variables = {
 
 const adminNovels = new Hono<{ Variables: Variables }>();
 
-adminNovels.use("/*", dashboardAuthMiddleware);
+adminNovels.use("/*", authMiddleware, adminMiddleware);
 
 // POST /api/admin/novels
 adminNovels.post("/", async (c) => {

@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 import { adminAds } from "./admin-ads.js";
+import { adminAuth } from "./admin-auth.js";
 import { adminAuthors } from "./admin-authors.js";
 import { adminCredits } from "./admin-credits.js";
 import { adminGenres } from "./admin-genres.js";
@@ -28,7 +29,8 @@ export function registerRoutes(app: Hono): void {
   app.route("/api/subscriptions", subscriptions);
   app.route("/api/credits", credits);
 
-  // Admin routes (dashboard basic auth)
+  // Admin routes (Firebase auth + admin role)
+  app.route("/api/admin/auth", adminAuth);
   app.route("/api/admin/novels", adminNovels);
   app.route("/api/admin/credits", adminCredits);
   app.route("/api/admin/genres", adminGenres);
