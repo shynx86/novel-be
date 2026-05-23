@@ -7,9 +7,7 @@ export interface NovelDocument {
   slug: string;
   title: string;
   description: string;
-  author: string;
   cover_url: string;
-  genre: string[];
   status: NovelStatus;
   chapter_count: number;
   total_word_count: number;
@@ -26,9 +24,7 @@ export interface NovelCreateInput {
   slug: string;
   title: string;
   description?: string;
-  author: string;
   cover_url?: string;
-  genre?: string[];
   status?: NovelStatus;
   rating?: number;
   views?: number;
@@ -40,9 +36,7 @@ export interface NovelUpdateInput {
   slug?: string;
   title?: string;
   description?: string;
-  author?: string;
   cover_url?: string;
-  genre?: string[];
   status?: NovelStatus;
   rating?: number;
   views?: number;
@@ -142,7 +136,6 @@ export interface AuthorDocument {
   slug: string;
   bio: string;
   avatar_url: string;
-  novel_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -167,7 +160,6 @@ export interface TranslatorDocument {
   slug: string;
   bio: string;
   avatar_url: string;
-  novel_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -190,7 +182,6 @@ export interface GenreDocument {
   id: string;
   name: string;
   slug: string;
-  novel_count: number;
 }
 
 export interface GenreCreateInput {
@@ -201,6 +192,43 @@ export interface GenreCreateInput {
 export interface GenreUpdateInput {
   name?: string;
   slug?: string;
+}
+
+// Junction collection documents
+
+export interface NovelAuthorDocument {
+  novel_id: string;
+  author_id: string;
+  created_at: string;
+}
+
+export interface NovelTranslatorDocument {
+  novel_id: string;
+  translator_id: string;
+  created_at: string;
+}
+
+export interface NovelGenreDocument {
+  novel_id: string;
+  genre_id: string;
+  created_at: string;
+}
+
+// Resolved relation types (id + name)
+
+export interface NovelAuthorRelation {
+  author_id: string;
+  author_name: string;
+}
+
+export interface NovelTranslatorRelation {
+  translator_id: string;
+  translator_name: string;
+}
+
+export interface NovelGenreRelation {
+  genre_id: string;
+  genre_name: string;
 }
 
 export interface UserDocument {

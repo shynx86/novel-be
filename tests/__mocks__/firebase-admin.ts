@@ -43,7 +43,13 @@ export const mockTransactionUpdate: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockBatchDelete: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockBatchSet: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockBatchCommit: any = jest.fn();
+
+// getAll mock (for batch fetching multiple documents)
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockGetAll: any = jest.fn();
 
 // FieldValue sentinel mock
 const FieldValue = {
@@ -111,8 +117,10 @@ const mockApp = {
     collection: jest.fn(() => createCollectionRef()),
     listCollections: jest.fn(),
     runTransaction: mockRunTransaction,
+    getAll: mockGetAll,
     batch: jest.fn(() => ({
       delete: mockBatchDelete,
+      set: mockBatchSet,
       commit: mockBatchCommit,
     })),
   }),
@@ -123,8 +131,10 @@ const firestoreFn = jest.fn(() => ({
   collection: jest.fn(() => createCollectionRef()),
   listCollections: jest.fn(),
   runTransaction: mockRunTransaction,
+  getAll: mockGetAll,
   batch: jest.fn(() => ({
     delete: mockBatchDelete,
+    set: mockBatchSet,
     commit: mockBatchCommit,
   })),
 }));
