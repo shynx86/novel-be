@@ -162,11 +162,83 @@ export async function listNovels(params: {
   page?: number;
   limit?: number;
   status?: string;
+  author_id?: string;
+  translator_id?: string;
+  genre_id?: string;
 }): Promise<PaginatedResult<NovelDocument>> {
   const db = getFirestore();
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 100);
 
+  // If junction filters are provided, get novel IDs from junction collections first
+  const hasJunctionFilter = params.author_id || params.translator_id || params.genre_id;
+
+  if (hasJunctionFilter) {
+    let novelIds: string[] | null = null;
+
+    if (params.author_id) {
+      const snapshot = await db
+        .collection("novel_authors")
+        .where("author_id", "==", params.author_id)
+        .get();
+      novelIds = snapshot.docs.map((d) => d.data().novel_id as string);
+    }
+
+    if (params.translator_id) {
+      const snapshot = await db
+        .collection("novel_translators")
+        .where("translator_id", "==", params.translator_id)
+        .get();
+      const translatorNovelIds = snapshot.docs.map((d) => d.data().novel_id as string);
+      novelIds = novelIds
+        ? novelIds.filter((id) => translatorNovelIds.includes(id))
+        : translatorNovelIds;
+    }
+
+    if (params.genre_id) {
+      const snapshot = await db
+        .collection("novel_genres")
+        .where("genre_id", "==", params.genre_id)
+        .get();
+      const genreNovelIds = snapshot.docs.map((d) => d.data().novel_id as string);
+      novelIds = novelIds ? novelIds.filter((id) => genreNovelIds.includes(id)) : genreNovelIds;
+    }
+
+    if (!novelIds || novelIds.length === 0) {
+      return { items: [], page, limit, total: 0 };
+    }
+
+    // Apply status filter if provided
+    let filteredIds = novelIds;
+    if (params.status) {
+      const statusSnapshot = await db
+        .collection("novels")
+        .where("status", "==", params.status)
+        .select()
+        .get();
+      const statusIds = new Set(statusSnapshot.docs.map((d) => d.id));
+      filteredIds = novelIds.filter((id) => statusIds.has(id));
+    }
+
+    const total = filteredIds.length;
+    const paginatedIds = filteredIds.slice((page - 1) * limit, page * limit);
+
+    if (paginatedIds.length === 0) {
+      return { items: [], page, limit, total };
+    }
+
+    // Fetch novels
+    const novelRefs = paginatedIds.map((id) => db.collection("novels").doc(id));
+    const novelDocs = await db.getAll(...novelRefs);
+    const novels = novelDocs
+      .filter((doc) => doc.exists && doc.data())
+      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+      .map((doc) => novelDocToData(doc.id, doc.data()!));
+
+    return { items: novels, page, limit, total };
+  }
+
+  // Standard query without junction filters
   let query: admin.firestore.Query = db.collection("novels");
 
   if (params.status) {
