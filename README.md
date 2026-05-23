@@ -82,8 +82,8 @@ Request → CORS → Request Logger → Route Handler → Error Handler → Resp
  │           └── read_chapters: number[]
  │
  ├── novels/{novelId}
- │     ├── slug, title, description, author
- │     ├── cover_url, genre: string[]
+ │     ├── slug, title, description
+ │     ├── cover_url
  │     ├── status: "ongoing" | "completed" | "hiatus"
  │     ├── chapter_count, total_word_count
  │     ├── rating, views, followers, comment_count
@@ -95,6 +95,18 @@ Request → CORS → Request Logger → Route Handler → Error Handler → Resp
  │           ├── access_type: "free" | "free_auth" | "paid"
  │           ├── price: number
  │           └── created_at, updated_at
+ │
+ ├── novel_authors/{novelId}:{authorId}  ← junction
+ │     ├── novel_id, author_id
+ │     └── created_at
+ │
+ ├── novel_translators/{novelId}:{translatorId}  ← junction
+ │     ├── novel_id, translator_id
+ │     └── created_at
+ │
+ ├── novel_genres/{novelId}:{genreId}    ← junction
+ │     ├── novel_id, genre_id
+ │     └── created_at
  │
  ├── subscriptions/{subId}
  │     ├── user_id, novel_id, chapter_index
@@ -110,16 +122,13 @@ Request → CORS → Request Logger → Route Handler → Error Handler → Resp
  │
  ├── genres/{genreId}
  │     ├── name, slug
- │     └── novel_count
  │
  ├── authors/{authorId}
  │     ├── name, slug, bio, avatar_url
- │     ├── novel_count
  │     └── created_at, updated_at
  │
  ├── translators/{translatorId}
  │     ├── name, slug, bio, avatar_url
- │     ├── novel_count
  │     └── created_at, updated_at
  │
  └── ads/{adId}
@@ -149,8 +158,8 @@ All routes prefixed with `/api/`. List endpoints support `page` and `limit` quer
 |---|---|---|
 | GET | `/api/health` | Health check (Firestore connectivity) |
 | GET | `/api/genres` | List all genres |
-| GET | `/api/search?q=&genre=&status=` | Search novels |
-| GET | `/api/novels` | List novels (filters: `genre`, `status`) |
+| GET | `/api/search?q=&status=` | Search novels |
+| GET | `/api/novels` | List novels (filters: `status`, `author_id`, `translator_id`, `genre_id`) |
 | GET | `/api/novels/trending` | Trending novels |
 | GET | `/api/novels/completed` | Completed novels |
 | GET | `/api/novels/sitemap` | Sitemap data |
@@ -310,6 +319,22 @@ npm run deploy
 ```
 
 Deploys to Firebase Cloud Functions in `asia-southeast1`.
+
+## Migration
+
+After deploying, run the migration script to move existing `author` and `genre` data from novels to junction collections:
+
+```bash
+npx tsx scripts/migrate-remove-author-genre.ts
+```
+
+This script:
+1. Reads all novels with `author`/`genre` fields
+2. Looks up corresponding author/genre documents by name
+3. Creates junction documents in `novel_authors`/`novel_genres`
+4. Removes `author` and `genre` fields from novel documents
+
+**Prerequisites**: Authors and genres must already exist in their respective collections before running the migration.
 
 ## License
 
