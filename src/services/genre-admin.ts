@@ -9,7 +9,6 @@ function genreDocToData(id: string, data: admin.firestore.DocumentData): GenreDo
     id,
     name: data.name,
     slug: data.slug,
-    novel_count: data.novel_count ?? 0,
   };
 }
 
@@ -45,7 +44,6 @@ export async function createGenre(input: GenreCreateInput): Promise<GenreDocumen
   const docData = {
     name: input.name,
     slug,
-    novel_count: 0,
   };
 
   const ref = await db.collection("genres").add(docData);

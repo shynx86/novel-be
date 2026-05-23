@@ -16,7 +16,6 @@ function translatorDocToData(id: string, data: admin.firestore.DocumentData): Tr
     slug: data.slug,
     bio: data.bio ?? "",
     avatar_url: data.avatar_url ?? "",
-    novel_count: data.novel_count ?? 0,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -68,7 +67,6 @@ export async function createTranslator(input: TranslatorCreateInput): Promise<Tr
     slug,
     bio: input.bio ?? "",
     avatar_url: input.avatar_url ?? "",
-    novel_count: 0,
     created_at: now,
     updated_at: now,
   };
@@ -110,4 +108,14 @@ export async function deleteTranslator(translatorId: string): Promise<void> {
 
   await db.collection("translators").doc(translatorId).delete();
   logger.info("Translator deleted", { translatorId });
+}
+
+export async function getTranslatorsByIds(ids: string[]): Promise<TranslatorDocument[]> {
+  if (ids.length === 0) return [];
+  const db = getFirestore();
+  const refs = ids.map((id) => db.collection("translators").doc(id));
+  const docs = await db.getAll(...refs);
+  return docs
+    .filter((doc) => doc.exists && doc.data())
+    .map((doc) => translatorDocToData(doc.id, doc.data()!));
 }

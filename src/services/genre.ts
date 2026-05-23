@@ -5,7 +5,6 @@ export interface GenreDocument {
   id: string;
   name: string;
   slug: string;
-  novel_count: number;
 }
 
 function genreDocToData(id: string, data: admin.firestore.DocumentData): GenreDocument {
@@ -13,7 +12,6 @@ function genreDocToData(id: string, data: admin.firestore.DocumentData): GenreDo
     id,
     name: data.name,
     slug: data.slug,
-    novel_count: data.novel_count ?? 0,
   };
 }
 
@@ -33,21 +31,12 @@ export async function listGenres(): Promise<GenreDocument[]> {
   return snapshot.docs.map((doc) => genreDocToData(doc.id, doc.data()));
 }
 
-export async function updateGenreCounts(): Promise<void> {
+export async function getGenresByIds(ids: string[]): Promise<GenreDocument[]> {
+  if (ids.length === 0) return [];
   const db = getFirestore();
-  const genresSnapshot = await db.collection("genres").get();
-
-  const batch = db.batch();
-  for (const doc of genresSnapshot.docs) {
-    const genreName = doc.data().name;
-    const countSnapshot = await db
-      .collection("novels")
-      .where("genre", "array-contains", genreName)
-      .count()
-      .get();
-
-    batch.update(doc.ref, { novel_count: countSnapshot.data().count });
-  }
-
-  await batch.commit();
+  const refs = ids.map((id) => db.collection("genres").doc(id));
+  const docs = await db.getAll(...refs);
+  return docs
+    .filter((doc) => doc.exists && doc.data())
+    .map((doc) => genreDocToData(doc.id, doc.data()!));
 }
