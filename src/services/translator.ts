@@ -115,7 +115,10 @@ export async function getTranslatorsByIds(ids: string[]): Promise<TranslatorDocu
   const db = getFirestore();
   const refs = ids.map((id) => db.collection("translators").doc(id));
   const docs = await db.getAll(...refs);
-  return docs
-    .filter((doc) => doc.exists && doc.data())
-    .map((doc) => translatorDocToData(doc.id, doc.data()!));
+  return (
+    docs
+      .filter((doc) => doc.exists && doc.data())
+      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+      .map((doc) => translatorDocToData(doc.id, doc.data()!))
+  );
 }

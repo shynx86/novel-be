@@ -36,7 +36,10 @@ export async function getGenresByIds(ids: string[]): Promise<GenreDocument[]> {
   const db = getFirestore();
   const refs = ids.map((id) => db.collection("genres").doc(id));
   const docs = await db.getAll(...refs);
-  return docs
-    .filter((doc) => doc.exists && doc.data())
-    .map((doc) => genreDocToData(doc.id, doc.data()!));
+  return (
+    docs
+      .filter((doc) => doc.exists && doc.data())
+      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+      .map((doc) => genreDocToData(doc.id, doc.data()!))
+  );
 }

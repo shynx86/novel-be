@@ -115,7 +115,10 @@ export async function getAuthorsByIds(ids: string[]): Promise<AuthorDocument[]> 
   const db = getFirestore();
   const refs = ids.map((id) => db.collection("authors").doc(id));
   const docs = await db.getAll(...refs);
-  return docs
-    .filter((doc) => doc.exists && doc.data())
-    .map((doc) => authorDocToData(doc.id, doc.data()!));
+  return (
+    docs
+      .filter((doc) => doc.exists && doc.data())
+      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+      .map((doc) => authorDocToData(doc.id, doc.data()!))
+  );
 }
