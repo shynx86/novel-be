@@ -8,24 +8,27 @@
  * 4. Removes `author` and `genre` fields from novel documents
  *
  * Usage:
- *   npx tsx scripts/migrate-remove-author-genre.ts
+ *   node --env-file=.env --import tsx/esm scripts/migrate-remove-author-genre.ts
  *
  * Prerequisites:
  *   - Authors must already exist in the `authors` collection
  *   - Genres must already exist in the `genres` collection
+ *   - .env file with GOOGLE_APPLICATION_CREDENTIALS pointing to service account
  */
 
 import admin from "firebase-admin";
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin using same pattern as the app
+const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.PROJECT_ID || "";
 admin.initializeApp({
-  projectId: process.env.FIREBASE_PROJECT_ID || "moonlit-novel",
+  projectId: projectId || undefined,
 });
 
 const db = admin.firestore();
 
 async function migrate(): Promise<void> {
   console.log("Starting migration: remove author/genre from novels");
+  console.log(`Using project: ${projectId || "(default)"}`);
 
   // Step 1: Build author name → ID lookup
   console.log("Building author lookup...");

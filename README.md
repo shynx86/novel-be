@@ -325,7 +325,7 @@ Deploys to Firebase Cloud Functions in `asia-southeast1`.
 After deploying, run the migration script to move existing `author` and `genre` data from novels to junction collections:
 
 ```bash
-npx tsx scripts/migrate-remove-author-genre.ts
+node --env-file=.env --import tsx/esm scripts/migrate-remove-author-genre.ts
 ```
 
 This script:
