@@ -8,7 +8,6 @@ import type {
 import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
-import { getGenreBySlug } from "./genre.js";
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
@@ -16,9 +15,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     slug: data.slug || id,
     title: data.title,
     description: data.description,
-    author: data.author,
     cover_url: data.cover_url,
-    genre: data.genre || [],
     status: data.status,
     chapter_count: data.chapter_count || 0,
     total_word_count: data.total_word_count || 0,
@@ -40,9 +37,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     slug: input.slug,
     title: input.title,
     description: input.description || "",
-    author: input.author,
     cover_url: input.cover_url || "",
-    genre: input.genre || [],
     status: input.status || "ongoing",
     chapter_count: 0,
     total_word_count: 0,
@@ -108,22 +103,42 @@ export async function getRelatedNovels(
   genreIndex = 0,
   limit = 10,
 ): Promise<NovelDocument[]> {
-  const novel = await getNovel(novelId);
-  const genre = novel.genre[genreIndex];
-  if (!genre) return [];
-
   const db = getFirestore();
-  const snapshot = await db
-    .collection("novels")
-    .where("genre", "array-contains", genre)
-    .orderBy("updated_at", "desc")
+
+  // Get the novel's genre relations
+  const genreSnapshot = await db.collection("novel_genres").where("novel_id", "==", novelId).get();
+
+  if (genreSnapshot.empty) return [];
+
+  const genreIds = genreSnapshot.docs.map((d) => d.data().genre_id as string);
+  const targetGenreId = genreIds[genreIndex];
+  if (!targetGenreId) return [];
+
+  // Find other novels that share this genre
+  const novelGenreSnapshot = await db
+    .collection("novel_genres")
+    .where("genre_id", "==", targetGenreId)
+    .orderBy("created_at", "desc")
     .limit(limit + 1)
     .get();
 
-  return snapshot.docs
-    .map((doc) => novelDocToData(doc.id, doc.data()))
-    .filter((n) => n.id !== novelId)
+  const relatedNovelIds = novelGenreSnapshot.docs
+    .map((d) => d.data().novel_id as string)
+    .filter((id) => id !== novelId)
     .slice(0, limit);
+
+  if (relatedNovelIds.length === 0) return [];
+
+  // Fetch the related novels
+  const novelRefs = relatedNovelIds.map((id) => db.collection("novels").doc(id));
+  const novelDocs = await db.getAll(...novelRefs);
+
+  return (
+    novelDocs
+      .filter((doc) => doc.exists && doc.data())
+      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+      .map((doc) => novelDocToData(doc.id, doc.data()!))
+  );
 }
 
 export async function getTrendingNovels(limit = 10): Promise<NovelDocument[]> {
@@ -146,7 +161,6 @@ export async function getCompletedNovels(limit = 10): Promise<NovelDocument[]> {
 export async function listNovels(params: {
   page?: number;
   limit?: number;
-  genre?: string;
   status?: string;
 }): Promise<PaginatedResult<NovelDocument>> {
   const db = getFirestore();
@@ -157,10 +171,6 @@ export async function listNovels(params: {
 
   if (params.status) {
     query = query.where("status", "==", params.status);
-  }
-
-  if (params.genre) {
-    query = query.where("genre", "array-contains", params.genre);
   }
 
   // Get total count
@@ -193,9 +203,7 @@ export async function updateNovel(
   if (input.slug !== undefined) updates.slug = input.slug;
   if (input.title !== undefined) updates.title = input.title;
   if (input.description !== undefined) updates.description = input.description;
-  if (input.author !== undefined) updates.author = input.author;
   if (input.cover_url !== undefined) updates.cover_url = input.cover_url;
-  if (input.genre !== undefined) updates.genre = input.genre;
   if (input.status !== undefined) updates.status = input.status;
   if (input.rating !== undefined) updates.rating = input.rating;
   if (input.views !== undefined) updates.views = input.views;

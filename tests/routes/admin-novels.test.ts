@@ -81,8 +81,6 @@ describe("POST /api/admin/novels", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.title).toBe("New Novel");
-    expect(body.data.author).toBe("Author Name");
-    expect(body.data.genre).toEqual(["Fantasy", "Adventure"]);
   });
 
   it("returns 400 when title is missing", async () => {
