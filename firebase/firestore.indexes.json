@@ -33,23 +33,6 @@
       ]
     },
     {
-      "collectionGroup": "novels",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "genre", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "updated_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "novels",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "genre", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "updated_at", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "credit_transactions",
       "queryScope": "COLLECTION",
       "fields": [
@@ -71,6 +54,51 @@
       "fields": [
         { "fieldPath": "user_id", "order": "ASCENDING" },
         { "fieldPath": "last_read_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novel_authors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "author_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novel_authors",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "novel_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novel_translators",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "translator_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novel_translators",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "novel_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novel_genres",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "genre_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novel_genres",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "novel_id", "order": "ASCENDING" }
       ]
     }
   ],
