@@ -65,13 +65,6 @@
       ]
     },
     {
-      "collectionGroup": "novel_authors",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "novel_id", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "novel_translators",
       "queryScope": "COLLECTION",
       "fields": [
@@ -80,25 +73,11 @@
       ]
     },
     {
-      "collectionGroup": "novel_translators",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "novel_id", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "novel_genres",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "genre_id", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "novel_genres",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "novel_id", "order": "ASCENDING" }
       ]
     }
   ],
