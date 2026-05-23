@@ -33,23 +33,6 @@
       ]
     },
     {
-      "collectionGroup": "novels",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "genre", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "updated_at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "novels",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "genre", "arrayConfig": "CONTAINS" },
-        { "fieldPath": "updated_at", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "credit_transactions",
       "queryScope": "COLLECTION",
       "fields": [

@@ -7,9 +7,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     id,
     title: data.title,
     description: data.description,
-    author: data.author,
     cover_url: data.cover_url,
-    genre: data.genre || [],
     status: data.status,
     chapter_count: data.chapter_count || 0,
     total_word_count: data.total_word_count || 0,
@@ -26,7 +24,6 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
 
 export async function searchNovels(params: {
   q?: string;
-  genre?: string;
   status?: string;
   page?: number;
   limit?: number;
@@ -39,10 +36,6 @@ export async function searchNovels(params: {
 
   if (params.status) {
     query = query.where("status", "==", params.status);
-  }
-
-  if (params.genre) {
-    query = query.where("genre", "array-contains", params.genre);
   }
 
   // Firestore prefix matching: title >= q && title <= q + \uf8ff

@@ -81,8 +81,6 @@ describe("POST /api/admin/novels", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.title).toBe("New Novel");
-    expect(body.data.author).toBe("Author Name");
-    expect(body.data.genre).toEqual(["Fantasy", "Adventure"]);
   });
 
   it("returns 400 when title is missing", async () => {
@@ -95,21 +93,6 @@ describe("POST /api/admin/novels", () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ author: "Author" }),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 400 when author is missing", async () => {
-    setupAdminAuth();
-
-    const res = await app.request("/api/admin/novels", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer admin-token",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title: "Novel" }),
     });
 
     expect(res.status).toBe(400);

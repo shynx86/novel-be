@@ -54,10 +54,19 @@ novels.get("/by-slug/:slug", async (c) => {
 // GET /api/novels
 novels.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
-  const genre = c.req.query("genre");
   const status = c.req.query("status");
+  const authorId = c.req.query("author_id");
+  const translatorId = c.req.query("translator_id");
+  const genreId = c.req.query("genre_id");
 
-  const result = await listNovels({ page, limit, genre, status });
+  const result = await listNovels({
+    page,
+    limit,
+    status,
+    author_id: authorId,
+    translator_id: translatorId,
+    genre_id: genreId,
+  });
   return c.json({ data: result }, 200);
 });
 

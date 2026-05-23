@@ -8,6 +8,11 @@ import {
   listChapters,
   updateChapter,
 } from "../services/chapter.js";
+import {
+  setNovelAuthors,
+  setNovelGenres,
+  setNovelTranslators,
+} from "../services/novel-relation.js";
 import { createNovel, deleteNovel, getNovel, listNovels, updateNovel } from "../services/novel.js";
 import { ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
@@ -29,9 +34,6 @@ adminNovels.post("/", async (c) => {
   if (!body.title || typeof body.title !== "string") {
     throw new ValidationError("title is required", { field: "title" });
   }
-  if (!body.author || typeof body.author !== "string") {
-    throw new ValidationError("author is required", { field: "author" });
-  }
 
   const novel = await createNovel({
     slug:
@@ -42,12 +44,21 @@ adminNovels.post("/", async (c) => {
         .replace(/(^-|-$)/g, ""),
     title: body.title,
     description: body.description,
-    author: body.author,
     cover_url: body.cover_url,
-    genre: body.genre,
     status: body.status,
     price: body.price,
   });
+
+  // Set relations if provided
+  if (Array.isArray(body.author_ids)) {
+    await setNovelAuthors(novel.id, body.author_ids);
+  }
+  if (Array.isArray(body.translator_ids)) {
+    await setNovelTranslators(novel.id, body.translator_ids);
+  }
+  if (Array.isArray(body.genre_ids)) {
+    await setNovelGenres(novel.id, body.genre_ids);
+  }
 
   return c.json({ data: novel }, 201);
 });
@@ -55,10 +66,9 @@ adminNovels.post("/", async (c) => {
 // GET /api/admin/novels
 adminNovels.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
-  const genre = c.req.query("genre");
   const status = c.req.query("status");
 
-  const result = await listNovels({ page, limit, genre, status });
+  const result = await listNovels({ page, limit, status });
   return c.json({ data: result }, 200);
 });
 
@@ -77,12 +87,21 @@ adminNovels.patch("/:novelId", async (c) => {
   const novel = await updateNovel(novelId, {
     title: body.title,
     description: body.description,
-    author: body.author,
     cover_url: body.cover_url,
-    genre: body.genre,
     status: body.status,
     price: body.price,
   });
+
+  // Update relations if provided
+  if (Array.isArray(body.author_ids)) {
+    await setNovelAuthors(novelId, body.author_ids);
+  }
+  if (Array.isArray(body.translator_ids)) {
+    await setNovelTranslators(novelId, body.translator_ids);
+  }
+  if (Array.isArray(body.genre_ids)) {
+    await setNovelGenres(novelId, body.genre_ids);
+  }
 
   return c.json({ data: novel }, 200);
 });

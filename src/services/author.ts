@@ -16,7 +16,6 @@ function authorDocToData(id: string, data: admin.firestore.DocumentData): Author
     slug: data.slug,
     bio: data.bio ?? "",
     avatar_url: data.avatar_url ?? "",
-    novel_count: data.novel_count ?? 0,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -68,7 +67,6 @@ export async function createAuthor(input: AuthorCreateInput): Promise<AuthorDocu
     slug,
     bio: input.bio ?? "",
     avatar_url: input.avatar_url ?? "",
-    novel_count: 0,
     created_at: now,
     updated_at: now,
   };
@@ -110,4 +108,17 @@ export async function deleteAuthor(authorId: string): Promise<void> {
 
   await db.collection("authors").doc(authorId).delete();
   logger.info("Author deleted", { authorId });
+}
+
+export async function getAuthorsByIds(ids: string[]): Promise<AuthorDocument[]> {
+  if (ids.length === 0) return [];
+  const db = getFirestore();
+  const refs = ids.map((id) => db.collection("authors").doc(id));
+  const docs = await db.getAll(...refs);
+  return (
+    docs
+      .filter((doc) => doc.exists && doc.data())
+      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+      .map((doc) => authorDocToData(doc.id, doc.data()!))
+  );
 }
