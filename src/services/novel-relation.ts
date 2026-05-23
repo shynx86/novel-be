@@ -171,8 +171,7 @@ export async function getNovelsByAuthor(
 
   let query: admin.firestore.Query = db
     .collection("novel_authors")
-    .where("author_id", "==", authorId)
-    .orderBy("created_at", "desc");
+    .where("author_id", "==", authorId);
 
   const totalCount = await db
     .collection("novel_authors")
@@ -201,8 +200,7 @@ export async function getNovelsByTranslator(
 
   let query: admin.firestore.Query = db
     .collection("novel_translators")
-    .where("translator_id", "==", translatorId)
-    .orderBy("created_at", "desc");
+    .where("translator_id", "==", translatorId);
 
   const totalCount = await db
     .collection("novel_translators")
@@ -229,10 +227,7 @@ export async function getNovelsByGenre(
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 100);
 
-  let query: admin.firestore.Query = db
-    .collection("novel_genres")
-    .where("genre_id", "==", genreId)
-    .orderBy("created_at", "desc");
+  let query: admin.firestore.Query = db.collection("novel_genres").where("genre_id", "==", genreId);
 
   const totalCount = await db
     .collection("novel_genres")

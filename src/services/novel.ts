@@ -118,7 +118,6 @@ export async function getRelatedNovels(
   const novelGenreSnapshot = await db
     .collection("novel_genres")
     .where("genre_id", "==", targetGenreId)
-    .orderBy("created_at", "desc")
     .limit(limit + 1)
     .get();
 
