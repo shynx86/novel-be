@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getFirestore } from "../services/firebase.js";
 import {
   createTranslator,
   deleteTranslator,
@@ -8,7 +9,7 @@ import {
   listTranslators,
   updateTranslator,
 } from "../services/translator.js";
-import { ValidationError } from "../utils/errors.js";
+import { ConflictError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
 const adminTranslators = new Hono();
@@ -59,6 +60,21 @@ adminTranslators.patch("/:translatorId", async (c) => {
 
 adminTranslators.delete("/:translatorId", async (c) => {
   const translatorId = c.req.param("translatorId");
+
+  // Check for linked novels
+  const db = getFirestore();
+  const linkedNovels = await db
+    .collection("novel_translators")
+    .where("translator_id", "==", translatorId)
+    .limit(1)
+    .get();
+
+  if (!linkedNovels.empty) {
+    throw new ConflictError("Cannot delete translator with linked novels", {
+      linked_novel_count: linkedNovels.size,
+    });
+  }
+
   await deleteTranslator(translatorId);
   return c.json({ data: { deleted: true } }, 200);
 });

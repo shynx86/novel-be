@@ -8,7 +8,8 @@ import {
   listAuthors,
   updateAuthor,
 } from "../services/author.js";
-import { ValidationError } from "../utils/errors.js";
+import { getFirestore } from "../services/firebase.js";
+import { ConflictError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
 const adminAuthors = new Hono();
@@ -59,6 +60,21 @@ adminAuthors.patch("/:authorId", async (c) => {
 
 adminAuthors.delete("/:authorId", async (c) => {
   const authorId = c.req.param("authorId");
+
+  // Check for linked novels
+  const db = getFirestore();
+  const linkedNovels = await db
+    .collection("novel_authors")
+    .where("author_id", "==", authorId)
+    .limit(1)
+    .get();
+
+  if (!linkedNovels.empty) {
+    throw new ConflictError("Cannot delete author with linked novels", {
+      linked_novel_count: linkedNovels.size,
+    });
+  }
+
   await deleteAuthor(authorId);
   return c.json({ data: { deleted: true } }, 200);
 });

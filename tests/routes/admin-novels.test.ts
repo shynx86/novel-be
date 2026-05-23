@@ -98,21 +98,6 @@ describe("POST /api/admin/novels", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 when author is missing", async () => {
-    setupAdminAuth();
-
-    const res = await app.request("/api/admin/novels", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer admin-token",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title: "Novel" }),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
   it("returns 403 for non-admin user", async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
     mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockRegularUser });

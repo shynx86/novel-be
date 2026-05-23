@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { getFirestore } from "../services/firebase.js";
 import { createGenre, deleteGenre, listGenresAdmin, updateGenre } from "../services/genre-admin.js";
-import { ValidationError } from "../utils/errors.js";
+import { ConflictError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
 const adminGenres = new Hono();
@@ -34,6 +35,21 @@ adminGenres.patch("/:genreId", async (c) => {
 
 adminGenres.delete("/:genreId", async (c) => {
   const genreId = c.req.param("genreId");
+
+  // Check for linked novels
+  const db = getFirestore();
+  const linkedNovels = await db
+    .collection("novel_genres")
+    .where("genre_id", "==", genreId)
+    .limit(1)
+    .get();
+
+  if (!linkedNovels.empty) {
+    throw new ConflictError("Cannot delete genre with linked novels", {
+      linked_novel_count: linkedNovels.size,
+    });
+  }
+
   await deleteGenre(genreId);
   return c.json({ data: { deleted: true } }, 200);
 });
