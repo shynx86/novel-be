@@ -9,6 +9,8 @@ import {
   updateAuthor,
 } from "../services/author.js";
 import { getFirestore } from "../services/firebase.js";
+import { enrichNovelWithRelations, getNovel, listNovels } from "../services/novel.js";
+import { getNovelsByAuthor } from "../services/novel-relation.js";
 import { ConflictError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
@@ -22,6 +24,22 @@ adminAuthors.get("/", async (c) => {
 
   const result = await listAuthors({ page, limit, search });
   return c.json({ data: result }, 200);
+});
+
+// GET /api/admin/authors/:authorId/novels — must be before /:authorId
+adminAuthors.get("/:authorId/novels", async (c) => {
+  const authorId = c.req.param("authorId");
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
+
+  const result = await getNovelsByAuthor(authorId, { page, limit });
+  const novels = await Promise.all(
+    result.items.map(async (novelId) => {
+      const novel = await getNovel(novelId);
+      return enrichNovelWithRelations(novel);
+    }),
+  );
+
+  return c.json({ data: { ...result, items: novels } }, 200);
 });
 
 adminAuthors.get("/:authorId", async (c) => {

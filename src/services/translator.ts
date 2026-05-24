@@ -9,13 +9,14 @@ import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
-function translatorDocToData(id: string, data: admin.firestore.DocumentData): TranslatorDocument {
+function translatorDocToData(id: string, data: admin.firestore.DocumentData, novelCount = 0): TranslatorDocument {
   return {
     id,
     name: data.name,
     slug: data.slug,
     bio: data.bio ?? "",
     avatar_url: data.avatar_url ?? "",
+    novel_count: novelCount,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -39,7 +40,15 @@ export async function listTranslators(params: {
   }
 
   const snapshot = await query.limit(limit).get();
-  const items = snapshot.docs.map((doc) => translatorDocToData(doc.id, doc.data()));
+
+  const countPromises = snapshot.docs.map((doc) =>
+    db.collection("novel_translators").where("translator_id", "==", doc.id).count().get(),
+  );
+  const countResults = await Promise.all(countPromises);
+
+  const items = snapshot.docs.map((doc, i) =>
+    translatorDocToData(doc.id, doc.data(), countResults[i].data().count),
+  );
 
   return { items, page, limit, total };
 }
@@ -49,7 +58,14 @@ export async function getTranslator(translatorId: string): Promise<TranslatorDoc
   const doc = await db.collection("translators").doc(translatorId).get();
   const data = doc.data();
   if (!doc.exists || !data) throw new NotFoundError("Translator not found");
-  return translatorDocToData(translatorId, data);
+
+  const countSnap = await db
+    .collection("novel_translators")
+    .where("translator_id", "==", translatorId)
+    .count()
+    .get();
+
+  return translatorDocToData(translatorId, data, countSnap.data().count);
 }
 
 export async function createTranslator(input: TranslatorCreateInput): Promise<TranslatorDocument> {
@@ -115,10 +131,16 @@ export async function getTranslatorsByIds(ids: string[]): Promise<TranslatorDocu
   const db = getFirestore();
   const refs = ids.map((id) => db.collection("translators").doc(id));
   const docs = await db.getAll(...refs);
+
+  const countPromises = ids.map((id) =>
+    db.collection("novel_translators").where("translator_id", "==", id).count().get(),
+  );
+  const countResults = await Promise.all(countPromises);
+
   return (
     docs
       .filter((doc) => doc.exists && doc.data())
       // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
-      .map((doc) => translatorDocToData(doc.id, doc.data()!))
+      .map((doc, i) => translatorDocToData(doc.id, doc.data()!, countResults[i].data().count))
   );
 }

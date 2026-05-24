@@ -139,6 +139,7 @@ export interface AuthorDocument {
   slug: string;
   bio: string;
   avatar_url: string;
+  novel_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -163,6 +164,7 @@ export interface TranslatorDocument {
   slug: string;
   bio: string;
   avatar_url: string;
+  novel_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -185,6 +187,7 @@ export interface GenreDocument {
   id: string;
   name: string;
   slug: string;
+  novel_count: number;
 }
 
 export interface GenreCreateInput {

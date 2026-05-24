@@ -9,13 +9,14 @@ import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
-function authorDocToData(id: string, data: admin.firestore.DocumentData): AuthorDocument {
+function authorDocToData(id: string, data: admin.firestore.DocumentData, novelCount = 0): AuthorDocument {
   return {
     id,
     name: data.name,
     slug: data.slug,
     bio: data.bio ?? "",
     avatar_url: data.avatar_url ?? "",
+    novel_count: novelCount,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -39,7 +40,16 @@ export async function listAuthors(params: {
   }
 
   const snapshot = await query.limit(limit).get();
-  const items = snapshot.docs.map((doc) => authorDocToData(doc.id, doc.data()));
+
+  // Batch count novels for each author
+  const countPromises = snapshot.docs.map((doc) =>
+    db.collection("novel_authors").where("author_id", "==", doc.id).count().get(),
+  );
+  const countResults = await Promise.all(countPromises);
+
+  const items = snapshot.docs.map((doc, i) =>
+    authorDocToData(doc.id, doc.data(), countResults[i].data().count),
+  );
 
   return { items, page, limit, total };
 }
@@ -49,7 +59,14 @@ export async function getAuthor(authorId: string): Promise<AuthorDocument> {
   const doc = await db.collection("authors").doc(authorId).get();
   const data = doc.data();
   if (!doc.exists || !data) throw new NotFoundError("Author not found");
-  return authorDocToData(authorId, data);
+
+  const countSnap = await db
+    .collection("novel_authors")
+    .where("author_id", "==", authorId)
+    .count()
+    .get();
+
+  return authorDocToData(authorId, data, countSnap.data().count);
 }
 
 export async function createAuthor(input: AuthorCreateInput): Promise<AuthorDocument> {
@@ -115,10 +132,16 @@ export async function getAuthorsByIds(ids: string[]): Promise<AuthorDocument[]> 
   const db = getFirestore();
   const refs = ids.map((id) => db.collection("authors").doc(id));
   const docs = await db.getAll(...refs);
+
+  const countPromises = ids.map((id) =>
+    db.collection("novel_authors").where("author_id", "==", id).count().get(),
+  );
+  const countResults = await Promise.all(countPromises);
+
   return (
     docs
       .filter((doc) => doc.exists && doc.data())
       // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
-      .map((doc) => authorDocToData(doc.id, doc.data()!))
+      .map((doc, i) => authorDocToData(doc.id, doc.data()!, countResults[i].data().count))
   );
 }
