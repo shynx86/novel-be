@@ -163,8 +163,8 @@ All routes prefixed with `/api/`. List endpoints support `page` and `limit` quer
 | GET | `/api/novels/trending` | Trending novels |
 | GET | `/api/novels/completed` | Completed novels |
 | GET | `/api/novels/sitemap` | Sitemap data |
-| GET | `/api/novels/by-slug/:slug` | Novel by slug |
-| GET | `/api/novels/:novelId` | Novel detail |
+| GET | `/api/novels/by-slug/:slug` | Novel by slug (includes genres, authors, translators) |
+| GET | `/api/novels/:novelId` | Novel detail (includes genres, authors, translators) |
 | GET | `/api/novels/:novelId/related` | Related novels |
 | GET | `/api/novels/:novelId/chapters` | List chapters (optional auth for `is_subscribed` annotation) |
 | GET | `/api/novels/:novelId/chapters/:index` | Read chapter (access controlled) |
@@ -319,22 +319,6 @@ npm run deploy
 ```
 
 Deploys to Firebase Cloud Functions in `asia-southeast1`.
-
-## Migration
-
-After deploying, run the migration script to move existing `author` and `genre` data from novels to junction collections:
-
-```bash
-node --env-file=.env --import tsx/esm scripts/migrate-remove-author-genre.ts
-```
-
-This script:
-1. Reads all novels with `author`/`genre` fields
-2. Looks up corresponding author/genre documents by name
-3. Creates junction documents in `novel_authors`/`novel_genres`
-4. Removes `author` and `genre` fields from novel documents
-
-**Prerequisites**: Authors and genres must already exist in their respective collections before running the migration.
 
 ## License
 
