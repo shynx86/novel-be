@@ -3,6 +3,7 @@ import { app } from "../../src/app.js";
 import {
   mockCountGet,
   mockDocGet,
+  mockGetAll,
   mockQueryGet,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
@@ -91,8 +92,37 @@ describe("GET /api/novels", () => {
 // ─── GET /api/novels/:novelId ──────────────────────────────────────────
 
 describe("GET /api/novels/:novelId", () => {
-  it("returns 200 with novel detail", async () => {
-    mockDocGet.mockResolvedValue({ exists: true, id: "novel-1", data: () => mockNovelDoc });
+  it("returns 200 with novel detail including relations", async () => {
+    // Novel doc
+    mockDocGet.mockResolvedValueOnce({ exists: true, id: "novel-1", data: () => mockNovelDoc });
+    // novel_authors query
+    mockQueryGet.mockResolvedValueOnce({
+      docs: [{ data: () => ({ novel_id: "novel-1", author_id: "author-1" }) }],
+    });
+    // getAll for authors
+    mockGetAll.mockResolvedValueOnce([
+      { exists: true, id: "author-1", data: () => ({ name: "Test Author" }) },
+    ]);
+    // novel_translators query
+    mockQueryGet.mockResolvedValueOnce({
+      docs: [{ data: () => ({ novel_id: "novel-1", translator_id: "translator-1" }) }],
+    });
+    // getAll for translators
+    mockGetAll.mockResolvedValueOnce([
+      { exists: true, id: "translator-1", data: () => ({ name: "Test Translator" }) },
+    ]);
+    // novel_genres query
+    mockQueryGet.mockResolvedValueOnce({
+      docs: [
+        { data: () => ({ novel_id: "novel-1", genre_id: "genre-1" }) },
+        { data: () => ({ novel_id: "novel-1", genre_id: "genre-2" }) },
+      ],
+    });
+    // getAll for genres
+    mockGetAll.mockResolvedValueOnce([
+      { exists: true, id: "genre-1", data: () => ({ name: "Fantasy" }) },
+      { exists: true, id: "genre-2", data: () => ({ name: "Adventure" }) },
+    ]);
 
     const res = await app.request("/api/novels/novel-1");
 
@@ -100,6 +130,27 @@ describe("GET /api/novels/:novelId", () => {
     const body = await res.json();
     expect(body.data.title).toBe("Test Novel");
     expect(body.data.id).toBe("novel-1");
+    expect(body.data.authors).toEqual([{ id: "author-1", name: "Test Author" }]);
+    expect(body.data.translators).toEqual([{ id: "translator-1", name: "Test Translator" }]);
+    expect(body.data.genres).toEqual([
+      { id: "genre-1", name: "Fantasy" },
+      { id: "genre-2", name: "Adventure" },
+    ]);
+  });
+
+  it("returns 200 with empty relations when none exist", async () => {
+    mockDocGet.mockResolvedValueOnce({ exists: true, id: "novel-1", data: () => mockNovelDoc });
+    mockQueryGet.mockResolvedValueOnce({ docs: [], empty: true }); // no authors
+    mockQueryGet.mockResolvedValueOnce({ docs: [], empty: true }); // no translators
+    mockQueryGet.mockResolvedValueOnce({ docs: [], empty: true }); // no genres
+
+    const res = await app.request("/api/novels/novel-1");
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.authors).toEqual([]);
+    expect(body.data.translators).toEqual([]);
+    expect(body.data.genres).toEqual([]);
   });
 
   it("returns 404 when novel not found", async () => {

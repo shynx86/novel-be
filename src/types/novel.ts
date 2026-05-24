@@ -18,6 +18,9 @@ export interface NovelDocument {
   price: number | null;
   created_at: string;
   updated_at: string;
+  genres?: { id: string; name: string }[];
+  authors?: { id: string; name: string }[];
+  translators?: { id: string; name: string }[];
 }
 
 export interface NovelCreateInput {
