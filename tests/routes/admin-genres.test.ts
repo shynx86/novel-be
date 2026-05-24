@@ -4,6 +4,7 @@ import {
   mockCollectionAdd,
   mockCountGet,
   mockDocGet,
+  mockDocSet,
   mockQueryGet,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
@@ -59,7 +60,9 @@ describe("GET /api/admin/genres", () => {
 describe("POST /api/admin/genres", () => {
   it("returns 201 with created genre", async () => {
     setupAdminAuth();
-    mockCollectionAdd.mockResolvedValue({ id: "genre-new" });
+    // Duplicate check → not exists
+    mockDocGet.mockResolvedValueOnce({ exists: false });
+    mockDocSet.mockResolvedValue(undefined);
 
     const res = await app.request("/api/admin/genres", {
       method: "POST",
@@ -73,6 +76,8 @@ describe("POST /api/admin/genres", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.name).toBe("Action");
+    expect(body.data.id).toBe("action");
+    expect(body.data.slug).toBe("action");
   });
 
   it("returns 400 when name is missing", async () => {
@@ -88,6 +93,23 @@ describe("POST /api/admin/genres", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("returns 409 when slug already exists", async () => {
+    setupAdminAuth();
+    // Duplicate check → exists
+    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => ({ name: "Action" }) });
+
+    const res = await app.request("/api/admin/genres", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: "Action" }),
+    });
+
+    expect(res.status).toBe(409);
   });
 });
 

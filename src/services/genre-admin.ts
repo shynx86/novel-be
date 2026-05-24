@@ -1,6 +1,6 @@
 import type admin from "firebase-admin";
 import type { GenreCreateInput, GenreDocument, GenreUpdateInput } from "../types/novel.js";
-import { NotFoundError } from "../utils/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
@@ -41,15 +41,21 @@ export async function createGenre(input: GenreCreateInput): Promise<GenreDocumen
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
 
+  // Check for duplicate slug
+  const existing = await db.collection("genres").doc(slug).get();
+  if (existing.exists) {
+    throw new ConflictError("Genre with this slug already exists", { slug });
+  }
+
   const docData = {
     name: input.name,
     slug,
   };
 
-  const ref = await db.collection("genres").add(docData);
-  logger.info("Genre created", { genreId: ref.id, name: input.name });
+  await db.collection("genres").doc(slug).set(docData);
+  logger.info("Genre created", { genreId: slug, name: input.name });
 
-  return genreDocToData(ref.id, docData);
+  return genreDocToData(slug, docData);
 }
 
 export async function updateGenre(
