@@ -8,6 +8,7 @@ import type {
 import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
+import { getNovelAuthors, getNovelGenres, getNovelTranslators } from "./novel-relation.js";
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
@@ -26,6 +27,20 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     price: data.price ?? null,
     created_at: data.created_at,
     updated_at: data.updated_at,
+  };
+}
+
+export async function enrichNovelWithRelations(novel: NovelDocument): Promise<NovelDocument> {
+  const [authors, translators, genres] = await Promise.all([
+    getNovelAuthors(novel.id),
+    getNovelTranslators(novel.id),
+    getNovelGenres(novel.id),
+  ]);
+  return {
+    ...novel,
+    authors: authors.map((a) => ({ id: a.author_id, name: a.author_name })),
+    translators: translators.map((t) => ({ id: t.translator_id, name: t.translator_name })),
+    genres: genres.map((g) => ({ id: g.genre_id, name: g.genre_name })),
   };
 }
 

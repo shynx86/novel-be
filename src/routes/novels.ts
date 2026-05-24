@@ -4,6 +4,7 @@ import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
 import { getChapter, listChapters } from "../services/chapter.js";
 import { getFirestore } from "../services/firebase.js";
 import {
+  enrichNovelWithRelations,
   getCompletedNovels,
   getNovel,
   getNovelBySlug,
@@ -48,7 +49,8 @@ novels.get("/completed", async (c) => {
 novels.get("/by-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
   const novel = await getNovelBySlug(slug);
-  return c.json({ data: novel }, 200);
+  const enriched = await enrichNovelWithRelations(novel);
+  return c.json({ data: enriched }, 200);
 });
 
 // GET /api/novels
@@ -74,7 +76,8 @@ novels.get("/", async (c) => {
 novels.get("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
   const novel = await getNovel(novelId);
-  return c.json({ data: novel }, 200);
+  const enriched = await enrichNovelWithRelations(novel);
+  return c.json({ data: enriched }, 200);
 });
 
 // GET /api/novels/:novelId/related
