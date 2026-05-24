@@ -158,7 +158,8 @@ export async function getRelatedNovels(
 export async function getTrendingNovels(limit = 10): Promise<NovelDocument[]> {
   const db = getFirestore();
   const snapshot = await db.collection("novels").orderBy("views", "desc").limit(limit).get();
-  return snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  return Promise.all(novels.map(enrichNovelWithRelations));
 }
 
 export async function getCompletedNovels(limit = 10): Promise<NovelDocument[]> {
@@ -169,7 +170,8 @@ export async function getCompletedNovels(limit = 10): Promise<NovelDocument[]> {
     .orderBy("updated_at", "desc")
     .limit(limit)
     .get();
-  return snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  return Promise.all(novels.map(enrichNovelWithRelations));
 }
 
 export async function listNovels(params: {
