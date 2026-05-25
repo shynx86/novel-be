@@ -11,18 +11,28 @@ const adminUpload = new Hono();
 adminUpload.use("/*", authMiddleware, adminMiddleware);
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ALLOWED_FOLDERS = ["cover_imgs", "author_imgs", "translator_imgs"] as const;
 const SIGNED_URL_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // POST /api/admin/upload/signed-url — generate a presigned write URL
 adminUpload.post("/signed-url", async (c) => {
   const body = await c.req.json();
-  const { filename, contentType } = body as { filename?: string; contentType?: string };
+  const { filename, contentType, folder } = body as {
+    filename?: string;
+    contentType?: string;
+    folder?: string;
+  };
 
   if (!filename || typeof filename !== "string") {
     throw new ValidationError("filename is required", { field: "filename" });
   }
   if (!contentType || typeof contentType !== "string") {
     throw new ValidationError("contentType is required", { field: "contentType" });
+  }
+  if (!folder || !ALLOWED_FOLDERS.includes(folder as (typeof ALLOWED_FOLDERS)[number])) {
+    throw new ValidationError(`folder is required and must be one of: ${ALLOWED_FOLDERS.join(", ")}`, {
+      field: "folder",
+    });
   }
 
   if (!ALLOWED_TYPES.includes(contentType)) {
@@ -32,7 +42,7 @@ adminUpload.post("/signed-url", async (c) => {
   }
 
   const ext = filename.split(".").pop() || "jpg";
-  const filePath = `uploads/${randomUUID()}.${ext}`;
+  const filePath = `${folder}/${randomUUID()}.${ext}`;
 
   let bucket;
   try {
@@ -69,8 +79,9 @@ adminUpload.post("/confirm", async (c) => {
     throw new ValidationError("path is required", { field: "path" });
   }
 
-  // Basic path validation — must start with uploads/ and not contain traversal
-  if (!filePath.startsWith("uploads/") || filePath.includes("..")) {
+  // Basic path validation — must start with an allowed folder and not contain traversal
+  const isValidFolder = ALLOWED_FOLDERS.some((f) => filePath.startsWith(`${f}/`));
+  if (!isValidFolder || filePath.includes("..")) {
     throw new ValidationError("Invalid file path");
   }
 
