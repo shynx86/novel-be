@@ -11,7 +11,7 @@ const bucket = admin.storage().bucket();
 
 const corsConfig = [
   {
-    origin: ["http://localhost:3000", "http://localhost:3001"],
+    origin: ["http://localhost:3000", "http://localhost:3001", "https://novel-fe-six.vercel.app"],
     method: ["GET", "PUT", "HEAD"],
     responseHeader: ["Content-Type", "Content-Length", "Content-MD5"],
     maxAgeSeconds: 3600,
