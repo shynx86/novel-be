@@ -9,6 +9,7 @@ export function getAdminApp(): admin.app.App {
   if (!adminApp) {
     adminApp = admin.initializeApp({
       projectId: env.projectId || undefined,
+      storageBucket: env.projectId ? `${env.projectId}.firebasestorage.app` : undefined,
     });
     logger.info("Firebase Admin initialized", { projectId: env.projectId });
   }

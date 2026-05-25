@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getAdminApp } from "../services/firebase.js";
@@ -9,41 +10,68 @@ const adminUpload = new Hono();
 
 adminUpload.use("/*", authMiddleware, adminMiddleware);
 
-// POST /api/admin/upload
-adminUpload.post("/", async (c) => {
-  const body = await c.req.parseBody();
-  const file = body["file"];
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const SIGNED_URL_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
-  if (!file || !(file instanceof File)) {
-    throw new ValidationError("file is required", { field: "file" });
+// POST /api/admin/upload/signed-url — generate a presigned write URL
+adminUpload.post("/signed-url", async (c) => {
+  const body = await c.req.json();
+  const { filename, contentType } = body as { filename?: string; contentType?: string };
+
+  if (!filename || typeof filename !== "string") {
+    throw new ValidationError("filename is required", { field: "filename" });
+  }
+  if (!contentType || typeof contentType !== "string") {
+    throw new ValidationError("contentType is required", { field: "contentType" });
   }
 
-  // Validate file type
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-  if (!allowedTypes.includes(file.type)) {
+  if (!ALLOWED_TYPES.includes(contentType)) {
     throw new ValidationError("File must be an image (JPEG, PNG, WebP, GIF)", {
-      field: "file",
+      field: "contentType",
     });
   }
 
-  // Validate file size (max 5MB)
-  const maxSize = 5 * 1024 * 1024;
-  if (file.size > maxSize) {
-    throw new ValidationError("File size must be less than 5MB", { field: "file" });
+  const ext = filename.split(".").pop() || "jpg";
+  const filePath = `uploads/${randomUUID()}.${ext}`;
+
+  let bucket;
+  try {
+    bucket = getAdminApp().storage().bucket();
+  } catch (e) {
+    logger.error("Failed to get storage bucket", { error: String(e) });
+    throw new ValidationError("Storage not configured");
   }
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const timestamp = Date.now();
-  const randomStr = Math.random().toString(36).substring(2, 8);
-  const filePath = `uploads/${timestamp}-${randomStr}.${ext}`;
-
-  let buffer: Buffer;
+  let signedUrl: string;
   try {
-    const arrayBuf = await file.arrayBuffer();
-    buffer = Buffer.from(arrayBuf);
+    const [url] = await bucket.file(filePath).getSignedUrl({
+      action: "write",
+      contentType,
+      expires: Date.now() + SIGNED_URL_EXPIRY_MS,
+    });
+    signedUrl = url;
   } catch (e) {
-    logger.error("Failed to read file buffer", { error: String(e) });
-    throw new ValidationError("Failed to read file data");
+    logger.error("Failed to generate signed URL", { error: String(e), filePath });
+    throw new ValidationError("Failed to generate upload URL");
+  }
+
+  logger.info("Signed upload URL generated", { filePath, contentType });
+
+  return c.json({ data: { signedUrl, path: filePath } }, 200);
+});
+
+// POST /api/admin/upload/confirm — validate file exists and return read URL
+adminUpload.post("/confirm", async (c) => {
+  const body = await c.req.json();
+  const { path: filePath, contentType } = body as { path?: string; contentType?: string };
+
+  if (!filePath || typeof filePath !== "string") {
+    throw new ValidationError("path is required", { field: "path" });
+  }
+
+  // Basic path validation — must start with uploads/ and not contain traversal
+  if (!filePath.startsWith("uploads/") || filePath.includes("..")) {
+    throw new ValidationError("Invalid file path");
   }
 
   let bucket;
@@ -54,30 +82,37 @@ adminUpload.post("/", async (c) => {
     throw new ValidationError("Storage not configured");
   }
 
-  try {
-    await bucket.file(filePath).save(buffer, {
-      metadata: { contentType: file.type },
-    });
-  } catch (e) {
-    logger.error("Failed to save file to storage", { error: String(e), filePath });
-    throw new ValidationError("Failed to save file to storage");
+  const file = bucket.file(filePath);
+
+  // Check file exists
+  const [exists] = await file.exists();
+  if (!exists) {
+    throw new ValidationError("File not found — upload may have failed");
   }
 
-  let signedUrl: string;
+  // Get metadata to verify content type if provided
+  const [metadata] = await file.getMetadata();
+  const detectedType = metadata.contentType;
+  if (contentType && detectedType !== contentType) {
+    logger.warn("Content type mismatch", { expected: contentType, actual: detectedType });
+  }
+
+  // Generate a long-lived read URL
+  let readUrl: string;
   try {
-    const [url] = await bucket.file(filePath).getSignedUrl({
+    const [url] = await file.getSignedUrl({
       action: "read",
       expires: "2036-01-01",
     });
-    signedUrl = url;
+    readUrl = url;
   } catch (e) {
-    logger.error("Failed to generate signed URL", { error: String(e), filePath });
+    logger.error("Failed to generate read URL", { error: String(e), filePath });
     throw new ValidationError("Failed to generate download URL");
   }
 
-  logger.info("File uploaded", { filePath, size: file.size });
+  logger.info("Upload confirmed", { filePath, size: metadata.size });
 
-  return c.json({ data: { url: signedUrl, path: filePath } }, 201);
+  return c.json({ data: { url: readUrl, path: filePath } }, 200);
 });
 
 export { adminUpload };
