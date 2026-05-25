@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getFirestore } from "../services/firebase.js";
+import { enrichNovelWithRelations, getNovel } from "../services/novel.js";
+import { getNovelsByTranslator } from "../services/novel-relation.js";
 import {
   createTranslator,
   deleteTranslator,
@@ -22,6 +24,22 @@ adminTranslators.get("/", async (c) => {
 
   const result = await listTranslators({ page, limit, search });
   return c.json({ data: result }, 200);
+});
+
+// GET /api/admin/translators/:translatorId/novels — must be before /:translatorId
+adminTranslators.get("/:translatorId/novels", async (c) => {
+  const translatorId = c.req.param("translatorId");
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
+
+  const result = await getNovelsByTranslator(translatorId, { page, limit });
+  const novels = await Promise.all(
+    result.items.map(async (novelId) => {
+      const novel = await getNovel(novelId);
+      return enrichNovelWithRelations(novel);
+    }),
+  );
+
+  return c.json({ data: { ...result, items: novels } }, 200);
 });
 
 adminTranslators.get("/:translatorId", async (c) => {

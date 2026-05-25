@@ -4,11 +4,12 @@ import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
-function genreDocToData(id: string, data: admin.firestore.DocumentData): GenreDocument {
+function genreDocToData(id: string, data: admin.firestore.DocumentData, novelCount = 0): GenreDocument {
   return {
     id,
     name: data.name,
     slug: data.slug,
+    novel_count: novelCount,
   };
 }
 
@@ -24,8 +25,13 @@ export async function listGenresAdmin(page: number, limit: number) {
   }
   const snapshot = await query.limit(limit).get();
 
+  const countPromises = snapshot.docs.map((doc) =>
+    db.collection("novel_genres").where("genre_id", "==", doc.id).count().get(),
+  );
+  const countResults = await Promise.all(countPromises);
+
   return {
-    items: snapshot.docs.map((doc) => genreDocToData(doc.id, doc.data())),
+    items: snapshot.docs.map((doc, i) => genreDocToData(doc.id, doc.data(), countResults[i].data().count)),
     page,
     limit,
     total,
