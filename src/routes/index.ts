@@ -5,6 +5,7 @@ import { adminAuthors } from "./admin-authors.js";
 import { adminCredits } from "./admin-credits.js";
 import { adminGenres } from "./admin-genres.js";
 import { adminNovels } from "./admin-novels.js";
+import { adminPush } from "./admin-push.js";
 import { adminSubscriptions } from "./admin-subscriptions.js";
 import { adminTranslators } from "./admin-translators.js";
 import { adminUpload } from "./admin-upload.js";
@@ -33,6 +34,7 @@ export function registerRoutes(app: Hono): void {
   // Admin routes (Firebase auth + admin role)
   app.route("/api/admin/auth", adminAuth);
   app.route("/api/admin/novels", adminNovels);
+  app.route("/api/admin/push", adminPush);
   app.route("/api/admin/credits", adminCredits);
   app.route("/api/admin/genres", adminGenres);
   app.route("/api/admin/users", adminUsers);
