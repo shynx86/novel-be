@@ -9,7 +9,11 @@ import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
-function authorDocToData(id: string, data: admin.firestore.DocumentData, novelCount = 0): AuthorDocument {
+function authorDocToData(
+  id: string,
+  data: admin.firestore.DocumentData,
+  novelCount = 0,
+): AuthorDocument {
   return {
     id,
     name: data.name,

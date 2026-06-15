@@ -1,5 +1,5 @@
-import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
+import { Hono } from "hono";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getAdminApp } from "../services/firebase.js";
@@ -30,9 +30,12 @@ adminUpload.post("/signed-url", async (c) => {
     throw new ValidationError("contentType is required", { field: "contentType" });
   }
   if (!folder || !ALLOWED_FOLDERS.includes(folder as (typeof ALLOWED_FOLDERS)[number])) {
-    throw new ValidationError(`folder is required and must be one of: ${ALLOWED_FOLDERS.join(", ")}`, {
-      field: "folder",
-    });
+    throw new ValidationError(
+      `folder is required and must be one of: ${ALLOWED_FOLDERS.join(", ")}`,
+      {
+        field: "folder",
+      },
+    );
   }
 
   if (!ALLOWED_TYPES.includes(contentType)) {
@@ -44,6 +47,7 @@ adminUpload.post("/signed-url", async (c) => {
   const ext = filename.split(".").pop() || "jpg";
   const filePath = `${folder}/${randomUUID()}.${ext}`;
 
+  // biome-ignore lint/suspicious/noImplicitAnyLet: complex bucket type, error thrown above
   let bucket;
   try {
     bucket = getAdminApp().storage().bucket();
@@ -85,6 +89,7 @@ adminUpload.post("/confirm", async (c) => {
     throw new ValidationError("Invalid file path");
   }
 
+  // biome-ignore lint/suspicious/noImplicitAnyLet: complex bucket type, error thrown above
   let bucket;
   try {
     bucket = getAdminApp().storage().bucket();

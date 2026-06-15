@@ -3,8 +3,8 @@ import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getFirestore } from "../services/firebase.js";
 import { createGenre, deleteGenre, listGenresAdmin, updateGenre } from "../services/genre-admin.js";
-import { enrichNovelWithRelations, getNovel } from "../services/novel.js";
 import { getNovelsByGenre } from "../services/novel-relation.js";
+import { enrichNovelWithRelations, getNovel } from "../services/novel.js";
 import { ConflictError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
@@ -42,13 +42,21 @@ adminGenres.get("/:genreId", async (c) => {
   if (!doc.exists) {
     return c.json({ error: { code: "NOT_FOUND", message: "Genre not found" } }, 404);
   }
-  const data = doc.data()!;
+  const data = doc.data();
+  if (!data) {
+    return c.json({ error: { code: "NOT_FOUND", message: "Genre not found" } }, 404);
+  }
   const countSnap = await db
     .collection("novel_genres")
     .where("genre_id", "==", genreId)
     .count()
     .get();
-  return c.json({ data: { id: genreId, name: data.name, slug: data.slug, novel_count: countSnap.data().count } }, 200);
+  return c.json(
+    {
+      data: { id: genreId, name: data.name, slug: data.slug, novel_count: countSnap.data().count },
+    },
+    200,
+  );
 });
 
 adminGenres.post("/", async (c) => {

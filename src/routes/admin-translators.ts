@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { getFirestore } from "../services/firebase.js";
-import { enrichNovelWithRelations, getNovel } from "../services/novel.js";
 import { getNovelsByTranslator } from "../services/novel-relation.js";
+import { enrichNovelWithRelations, getNovel } from "../services/novel.js";
 import {
   createTranslator,
   deleteTranslator,
