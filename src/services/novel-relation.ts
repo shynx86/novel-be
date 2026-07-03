@@ -1,10 +1,5 @@
 import type admin from "firebase-admin";
-import type {
-  NovelAuthorRelation,
-  NovelGenreRelation,
-  NovelTranslatorRelation,
-  PaginatedResult,
-} from "../types/novel.js";
+import type { NovelAuthorRelation, NovelGenreRelation, PaginatedResult } from "../types/novel.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
@@ -45,34 +40,6 @@ export async function setNovelAuthors(novelId: string, authorIds: string[]): Pro
 
   await batch.commit();
   logger.info("Novel authors updated", { novelId, authorIds });
-}
-
-export async function setNovelTranslators(novelId: string, translatorIds: string[]): Promise<void> {
-  const db = getFirestore();
-  const col = db.collection("novel_translators");
-
-  const existing = await col.where("novel_id", "==", novelId).get();
-  const existingIds = new Set(existing.docs.map((d) => d.data().translator_id));
-  const newIds = new Set(translatorIds);
-
-  const batch = db.batch();
-  const now = new Date().toISOString();
-
-  for (const doc of existing.docs) {
-    if (!newIds.has(doc.data().translator_id)) {
-      batch.delete(doc.ref);
-    }
-  }
-
-  for (const translatorId of translatorIds) {
-    if (!existingIds.has(translatorId)) {
-      const ref = col.doc(junctionDocId(novelId, translatorId));
-      batch.set(ref, { novel_id: novelId, translator_id: translatorId, created_at: now });
-    }
-  }
-
-  await batch.commit();
-  logger.info("Novel translators updated", { novelId, translatorIds });
 }
 
 export async function setNovelGenres(novelId: string, genreIds: string[]): Promise<void> {
@@ -123,24 +90,6 @@ export async function getNovelAuthors(novelId: string): Promise<NovelAuthorRelat
     }));
 }
 
-export async function getNovelTranslators(novelId: string): Promise<NovelTranslatorRelation[]> {
-  const db = getFirestore();
-  const snapshot = await db.collection("novel_translators").where("novel_id", "==", novelId).get();
-
-  if (snapshot.empty) return [];
-
-  const translatorIds = snapshot.docs.map((d) => d.data().translator_id as string);
-  const translatorRefs = translatorIds.map((id) => db.collection("translators").doc(id));
-  const translatorDocs = await db.getAll(...translatorRefs);
-
-  return translatorDocs
-    .filter((doc) => doc.exists)
-    .map((doc) => ({
-      translator_id: doc.id,
-      translator_name: doc.data()?.name,
-    }));
-}
-
 export async function getNovelGenres(novelId: string): Promise<NovelGenreRelation[]> {
   const db = getFirestore();
   const snapshot = await db.collection("novel_genres").where("novel_id", "==", novelId).get();
@@ -176,35 +125,6 @@ export async function getNovelsByAuthor(
   const totalCount = await db
     .collection("novel_authors")
     .where("author_id", "==", authorId)
-    .count()
-    .get();
-  const total = totalCount.data().count;
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novelIds = snapshot.docs.map((d) => d.data().novel_id as string);
-
-  return { items: novelIds, page, limit, total };
-}
-
-export async function getNovelsByTranslator(
-  translatorId: string,
-  params: { page?: number; limit?: number } = {},
-): Promise<PaginatedResult<string>> {
-  const db = getFirestore();
-  const page = params.page || 1;
-  const limit = Math.min(params.limit || 20, 100);
-
-  let query: admin.firestore.Query = db
-    .collection("novel_translators")
-    .where("translator_id", "==", translatorId);
-
-  const totalCount = await db
-    .collection("novel_translators")
-    .where("translator_id", "==", translatorId)
     .count()
     .get();
   const total = totalCount.data().count;

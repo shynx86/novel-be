@@ -16,11 +16,11 @@ export interface NovelDocument {
   followers: number;
   comment_count: number;
   price: number | null;
+  translator_id?: string;
   created_at: string;
   updated_at: string;
   genres?: { id: string; name: string }[];
   authors?: { id: string; name: string }[];
-  translators?: { id: string; name: string }[];
 }
 
 export interface NovelCreateInput {
@@ -33,6 +33,7 @@ export interface NovelCreateInput {
   views?: number;
   followers?: number;
   price?: number | null;
+  translator_id?: string;
 }
 
 export interface NovelUpdateInput {
@@ -45,6 +46,7 @@ export interface NovelUpdateInput {
   views?: number;
   followers?: number;
   price?: number | null;
+  translator_id?: string;
 }
 
 export interface ChapterDocument {
@@ -158,31 +160,6 @@ export interface AuthorUpdateInput {
   avatar_url?: string;
 }
 
-export interface TranslatorDocument {
-  id: string;
-  name: string;
-  slug: string;
-  bio: string;
-  avatar_url: string;
-  novel_count: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface TranslatorCreateInput {
-  name: string;
-  slug?: string;
-  bio?: string;
-  avatar_url?: string;
-}
-
-export interface TranslatorUpdateInput {
-  name?: string;
-  slug?: string;
-  bio?: string;
-  avatar_url?: string;
-}
-
 export interface GenreDocument {
   id: string;
   name: string;
@@ -208,12 +185,6 @@ export interface NovelAuthorDocument {
   created_at: string;
 }
 
-export interface NovelTranslatorDocument {
-  novel_id: string;
-  translator_id: string;
-  created_at: string;
-}
-
 export interface NovelGenreDocument {
   novel_id: string;
   genre_id: string;
@@ -227,11 +198,6 @@ export interface NovelAuthorRelation {
   author_name: string;
 }
 
-export interface NovelTranslatorRelation {
-  translator_id: string;
-  translator_name: string;
-}
-
 export interface NovelGenreRelation {
   genre_id: string;
   genre_name: string;
@@ -243,7 +209,7 @@ export interface UserDocument {
   display_name: string;
   avatar_url: string;
   credits: number;
-  role: "user" | "admin";
+  role: "user" | "admin" | "translator";
   created_at: string;
   updated_at: string;
 }

@@ -12,5 +12,6 @@ export const adminMiddleware: MiddlewareHandler = async (c, next) => {
   }
 
   c.set("isAdmin", true);
+  c.set("userRole", "admin");
   await next();
 };

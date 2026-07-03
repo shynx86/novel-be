@@ -11,13 +11,10 @@ import {
 // Must import after mocks are set up
 const {
   setNovelAuthors,
-  setNovelTranslators,
   setNovelGenres,
   getNovelAuthors,
-  getNovelTranslators,
   getNovelGenres,
   getNovelsByAuthor,
-  getNovelsByTranslator,
   getNovelsByGenre,
 } = await import("../../src/services/novel-relation.js");
 
@@ -80,36 +77,6 @@ describe("setNovelAuthors", () => {
     mockBatchCommit.mockResolvedValue(undefined);
 
     await setNovelAuthors("novel-1", []);
-
-    expect(mockBatchDelete).toHaveBeenCalledTimes(1);
-    expect(mockBatchSet).not.toHaveBeenCalled();
-  });
-});
-
-// ─── setNovelTranslators ────────────────────────────────────────────────────
-
-describe("setNovelTranslators", () => {
-  it("creates junction docs for new translator ids", async () => {
-    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
-    mockBatchCommit.mockResolvedValue(undefined);
-
-    await setNovelTranslators("novel-1", ["translator-1"]);
-
-    expect(mockBatchSet).toHaveBeenCalledTimes(1);
-    expect(mockBatchCommit).toHaveBeenCalledTimes(1);
-  });
-
-  it("removes relations for translator ids not in new list", async () => {
-    mockQueryGet.mockResolvedValue({
-      docs: [
-        { data: () => ({ translator_id: "translator-1" }), ref: { id: "novel-1:translator-1" } },
-        { data: () => ({ translator_id: "translator-2" }), ref: { id: "novel-1:translator-2" } },
-      ],
-      empty: false,
-    });
-    mockBatchCommit.mockResolvedValue(undefined);
-
-    await setNovelTranslators("novel-1", ["translator-1"]);
 
     expect(mockBatchDelete).toHaveBeenCalledTimes(1);
     expect(mockBatchSet).not.toHaveBeenCalled();
@@ -201,32 +168,6 @@ describe("getNovelAuthors", () => {
   });
 });
 
-// ─── getNovelTranslators ────────────────────────────────────────────────────
-
-describe("getNovelTranslators", () => {
-  it("returns translator ids and names", async () => {
-    mockQueryGet.mockResolvedValue({
-      docs: [{ data: () => ({ translator_id: "translator-1" }) }],
-      empty: false,
-    });
-    mockGetAll.mockResolvedValue([
-      { exists: true, id: "translator-1", data: () => ({ name: "Translator One" }) },
-    ]);
-
-    const result = await getNovelTranslators("novel-1");
-
-    expect(result).toEqual([{ translator_id: "translator-1", translator_name: "Translator One" }]);
-  });
-
-  it("returns empty array when no relations", async () => {
-    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
-
-    const result = await getNovelTranslators("novel-1");
-
-    expect(result).toEqual([]);
-  });
-});
-
 // ─── getNovelGenres ─────────────────────────────────────────────────────────
 
 describe("getNovelGenres", () => {
@@ -282,23 +223,6 @@ describe("getNovelsByAuthor", () => {
 
     expect(result.items).toEqual([]);
     expect(result.total).toBe(0);
-  });
-});
-
-// ─── getNovelsByTranslator ──────────────────────────────────────────────────
-
-describe("getNovelsByTranslator", () => {
-  it("returns paginated novel ids for a translator", async () => {
-    mockCountGet.mockResolvedValue({ data: () => ({ count: 1 }) });
-    mockQueryGet.mockResolvedValue({
-      docs: [{ data: () => ({ novel_id: "novel-3" }) }],
-      empty: false,
-    });
-
-    const result = await getNovelsByTranslator("translator-1");
-
-    expect(result.items).toEqual(["novel-3"]);
-    expect(result.total).toBe(1);
   });
 });
 

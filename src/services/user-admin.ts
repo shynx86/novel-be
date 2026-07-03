@@ -65,6 +65,14 @@ export async function updateUser(
   const doc = await db.collection("users").doc(uid).get();
   if (!doc.exists) throw new NotFoundError("User not found");
 
+  // Validate role
+  if (input.role !== undefined) {
+    const validRoles = ["user", "admin", "translator"];
+    if (!validRoles.includes(input.role)) {
+      throw new Error(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
+    }
+  }
+
   const now = new Date().toISOString();
   const updates: Record<string, unknown> = { updated_at: now };
   if (input.display_name !== undefined) updates.display_name = input.display_name;
