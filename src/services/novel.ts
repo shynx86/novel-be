@@ -282,14 +282,23 @@ export async function listNovels(params: {
   const total = totalCount.data().count;
 
   // Apply ordering and pagination
-  query = query.orderBy("updated_at", "desc");
+  // Note: Firestore requires composite index for where + orderBy on different fields
+  // For translator_id queries, we skip orderBy to avoid index issues
+  if (!params.translator_id) {
+    query = query.orderBy("updated_at", "desc");
+  }
 
   if (page > 1) {
     query = query.offset((page - 1) * limit);
   }
 
   const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  let novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+
+  // Sort manually when translator_id filter is used
+  if (params.translator_id) {
+    novels.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }
 
   return { items: novels, page, limit, total };
 }
