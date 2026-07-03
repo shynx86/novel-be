@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { translatorMiddleware } from "../middleware/translator.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { translatorMiddleware } from "../middleware/translator.js";
 
 const adminAuth = new Hono();
 

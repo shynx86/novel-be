@@ -118,13 +118,20 @@ adminNovels.patch("/:novelId", async (c) => {
     }
   }
 
-  const novel = await updateNovel(novelId, {
+  const updateData: Record<string, unknown> = {
     title: body.title,
     description: body.description,
     cover_url: body.cover_url,
     status: body.status,
     price: body.price,
-  });
+  };
+
+  // Admin can update translator_id
+  if (userRole === "admin" && body.translator_id !== undefined) {
+    updateData.translator_id = body.translator_id || null;
+  }
+
+  const novel = await updateNovel(novelId, updateData);
 
   // Update relations if provided
   if (Array.isArray(body.author_ids)) {
