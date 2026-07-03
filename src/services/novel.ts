@@ -32,14 +32,33 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
 }
 
 export async function enrichNovelWithRelations(novel: NovelDocument): Promise<NovelDocument> {
+  const db = getFirestore();
   const [authors, genres] = await Promise.all([
     getNovelAuthors(novel.id),
     getNovelGenres(novel.id),
   ]);
+
+  let translator: { id: string; name: string } | undefined;
+  if (novel.translator_id) {
+    try {
+      const userDoc = await db.collection("users").doc(novel.translator_id).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        translator = {
+          id: novel.translator_id,
+          name: userData?.display_name || userData?.email || "",
+        };
+      }
+    } catch {
+      // Ignore error if user not found
+    }
+  }
+
   return {
     ...novel,
     authors: authors.map((a) => ({ id: a.author_id, name: a.author_name })),
     genres: genres.map((g) => ({ id: g.genre_id, name: g.genre_name })),
+    translator,
   };
 }
 
