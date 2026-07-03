@@ -8,7 +8,7 @@ import type {
 import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
-import { getNovelAuthors, getNovelGenres, getNovelTranslators } from "./novel-relation.js";
+import { getNovelAuthors, getNovelGenres } from "./novel-relation.js";
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
@@ -25,22 +25,40 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     followers: data.followers ?? 0,
     comment_count: data.comment_count ?? 0,
     price: data.price ?? null,
+    translator_id: data.translator_id ?? undefined,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
 }
 
 export async function enrichNovelWithRelations(novel: NovelDocument): Promise<NovelDocument> {
-  const [authors, translators, genres] = await Promise.all([
+  const db = getFirestore();
+  const [authors, genres] = await Promise.all([
     getNovelAuthors(novel.id),
-    getNovelTranslators(novel.id),
     getNovelGenres(novel.id),
   ]);
+
+  let translator: { id: string; name: string } | undefined;
+  if (novel.translator_id) {
+    try {
+      const userDoc = await db.collection("users").doc(novel.translator_id).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        translator = {
+          id: novel.translator_id,
+          name: userData?.display_name || userData?.email || "",
+        };
+      }
+    } catch {
+      // Ignore error if user not found
+    }
+  }
+
   return {
     ...novel,
     authors: authors.map((a) => ({ id: a.author_id, name: a.author_name })),
-    translators: translators.map((t) => ({ id: t.translator_id, name: t.translator_name })),
     genres: genres.map((g) => ({ id: g.genre_id, name: g.genre_name })),
+    translator,
   };
 }
 
@@ -48,7 +66,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
   const db = getFirestore();
   const now = new Date().toISOString();
 
-  const docData = {
+  const docData: Record<string, unknown> = {
     slug: input.slug,
     title: input.title,
     description: input.description || "",
@@ -64,6 +82,10 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     created_at: now,
     updated_at: now,
   };
+
+  if (input.translator_id) {
+    docData.translator_id = input.translator_id;
+  }
 
   const ref = await db.collection("novels").add(docData);
   logger.info("Novel created", { novelId: ref.id, title: input.title });
@@ -187,7 +209,7 @@ export async function listNovels(params: {
   const limit = Math.min(params.limit || 20, 100);
 
   // If junction filters are provided, get novel IDs from junction collections first
-  const hasJunctionFilter = params.author_id || params.translator_id || params.genre_id;
+  const hasJunctionFilter = params.author_id || params.genre_id;
 
   if (hasJunctionFilter) {
     let novelIds: string[] | null = null;
@@ -200,17 +222,6 @@ export async function listNovels(params: {
       novelIds = snapshot.docs.map((d) => d.data().novel_id as string);
     }
 
-    if (params.translator_id) {
-      const snapshot = await db
-        .collection("novel_translators")
-        .where("translator_id", "==", params.translator_id)
-        .get();
-      const translatorNovelIds = snapshot.docs.map((d) => d.data().novel_id as string);
-      novelIds = novelIds
-        ? novelIds.filter((id) => translatorNovelIds.includes(id))
-        : translatorNovelIds;
-    }
-
     if (params.genre_id) {
       const snapshot = await db
         .collection("novel_genres")
@@ -218,6 +229,26 @@ export async function listNovels(params: {
         .get();
       const genreNovelIds = snapshot.docs.map((d) => d.data().novel_id as string);
       novelIds = novelIds ? novelIds.filter((id) => genreNovelIds.includes(id)) : genreNovelIds;
+    }
+
+    // Apply translator_id filter (direct field)
+    if (params.translator_id) {
+      if (novelIds) {
+        // Filter existing novelIds by translator_id
+        const novelRefs = novelIds.map((id) => db.collection("novels").doc(id));
+        const novelDocs = await db.getAll(...novelRefs);
+        novelIds = novelDocs
+          .filter((doc) => doc.exists && doc.data()?.translator_id === params.translator_id)
+          .map((doc) => doc.id);
+      } else {
+        // Query directly by translator_id
+        const snapshot = await db
+          .collection("novels")
+          .where("translator_id", "==", params.translator_id)
+          .select()
+          .get();
+        novelIds = snapshot.docs.map((d) => d.id);
+      }
     }
 
     if (!novelIds || novelIds.length === 0) {
@@ -261,19 +292,32 @@ export async function listNovels(params: {
     query = query.where("status", "==", params.status);
   }
 
+  if (params.translator_id) {
+    query = query.where("translator_id", "==", params.translator_id);
+  }
+
   // Get total count
   const totalCount = await query.count().get();
   const total = totalCount.data().count;
 
   // Apply ordering and pagination
-  query = query.orderBy("updated_at", "desc");
+  // Note: Firestore requires composite index for where + orderBy on different fields
+  // For translator_id queries, we skip orderBy to avoid index issues
+  if (!params.translator_id) {
+    query = query.orderBy("updated_at", "desc");
+  }
 
   if (page > 1) {
     query = query.offset((page - 1) * limit);
   }
 
   const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  let novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+
+  // Sort manually when translator_id filter is used
+  if (params.translator_id) {
+    novels.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  }
 
   return { items: novels, page, limit, total };
 }
@@ -297,6 +341,7 @@ export async function updateNovel(
   if (input.views !== undefined) updates.views = input.views;
   if (input.followers !== undefined) updates.followers = input.followers;
   if (input.price !== undefined) updates.price = input.price;
+  if (input.translator_id !== undefined) updates.translator_id = input.translator_id;
 
   await db.collection("novels").doc(novelId).update(updates);
   logger.info("Novel updated", { novelId });

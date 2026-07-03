@@ -7,7 +7,6 @@ import { adminGenres } from "./admin-genres.js";
 import { adminNovels } from "./admin-novels.js";
 import { adminPush } from "./admin-push.js";
 import { adminSubscriptions } from "./admin-subscriptions.js";
-import { adminTranslators } from "./admin-translators.js";
 import { adminUpload } from "./admin-upload.js";
 import { adminUsers } from "./admin-users.js";
 import { auth } from "./auth.js";
@@ -41,6 +40,5 @@ export function registerRoutes(app: Hono): void {
   app.route("/api/admin/subscriptions", adminSubscriptions);
   app.route("/api/admin/ads", adminAds);
   app.route("/api/admin/authors", adminAuthors);
-  app.route("/api/admin/translators", adminTranslators);
   app.route("/api/admin/upload", adminUpload);
 }
