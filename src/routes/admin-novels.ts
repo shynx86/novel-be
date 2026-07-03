@@ -13,7 +13,14 @@ import {
   setNovelGenres,
   setNovelTranslators,
 } from "../services/novel-relation.js";
-import { createNovel, deleteNovel, getNovel, listNovels, updateNovel } from "../services/novel.js";
+import {
+  createNovel,
+  deleteNovel,
+  enrichNovelWithRelations,
+  getNovel,
+  listNovels,
+  updateNovel,
+} from "../services/novel.js";
 import { ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
@@ -76,7 +83,8 @@ adminNovels.get("/", async (c) => {
 adminNovels.get("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
   const novel = await getNovel(novelId);
-  return c.json({ data: novel }, 200);
+  const enriched = await enrichNovelWithRelations(novel);
+  return c.json({ data: enriched }, 200);
 });
 
 // PATCH /api/admin/novels/:novelId
