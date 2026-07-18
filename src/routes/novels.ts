@@ -5,7 +5,10 @@ import { getChapter, listChapters } from "../services/chapter.js";
 import { getFirestore } from "../services/firebase.js";
 import {
   enrichNovelWithRelations,
+  getCompletedFeaturedNovels,
   getCompletedNovels,
+  getFeaturedNovels,
+  getNewestNovels,
   getNovel,
   getNovelBySlug,
   getRelatedNovels,
@@ -42,6 +45,27 @@ novels.get("/trending", async (c) => {
 novels.get("/completed", async (c) => {
   const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
   const result = await getCompletedNovels(limit);
+  return c.json({ data: result }, 200);
+});
+
+// GET /api/novels/featured
+novels.get("/featured", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
+  const result = await getFeaturedNovels(limit);
+  return c.json({ data: result }, 200);
+});
+
+// GET /api/novels/completed-featured
+novels.get("/completed-featured", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
+  const result = await getCompletedFeaturedNovels(limit);
+  return c.json({ data: result }, 200);
+});
+
+// GET /api/novels/newest
+novels.get("/newest", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
+  const result = await getNewestNovels(limit);
   return c.json({ data: result }, 200);
 });
 

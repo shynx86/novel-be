@@ -16,6 +16,7 @@ export interface NovelDocument {
   followers: number;
   comment_count: number;
   price: number | null;
+  is_featured: boolean;
   translator_id?: string;
   created_at: string;
   updated_at: string;
@@ -34,6 +35,7 @@ export interface NovelCreateInput {
   views?: number;
   followers?: number;
   price?: number | null;
+  is_featured?: boolean;
   translator_id?: string;
 }
 
@@ -47,6 +49,7 @@ export interface NovelUpdateInput {
   views?: number;
   followers?: number;
   price?: number | null;
+  is_featured?: boolean;
   translator_id?: string;
 }
 

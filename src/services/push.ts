@@ -238,6 +238,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
     followers: (existingNovel.data()?.followers as number) ?? 0,
     comment_count: (existingNovel.data()?.comment_count as number) ?? 0,
     price: (existingNovel.data()?.price as number | null) ?? null,
+    is_featured: (existingNovel.data()?.is_featured as boolean) ?? false,
     created_at: (existingNovel.data()?.created_at as string) ?? now,
     updated_at: now,
   };
