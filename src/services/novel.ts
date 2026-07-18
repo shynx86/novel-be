@@ -311,6 +311,9 @@ export async function getNewestNovels(
   return searchNovels({ search, orderByField: "created_at", page, limit });
 }
 
+export type NovelSortBy = "created_at" | "updated_at" | "title" | "views" | "rating";
+export type SortOrder = "asc" | "desc";
+
 export async function listNovels(params: {
   page?: number;
   limit?: number;
@@ -319,6 +322,8 @@ export async function listNovels(params: {
   translator_id?: string;
   genre_id?: string;
   search?: string;
+  sort_by?: NovelSortBy;
+  sort_order?: SortOrder;
 }): Promise<PaginatedResult<NovelDocument>> {
   const db = getFirestore();
   const page = params.page || 1;
@@ -419,7 +424,17 @@ export async function listNovels(params: {
         return true;
       });
 
-    novels.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    const sortBy = params.sort_by || "created_at";
+    const sortOrder = params.sort_order || "desc";
+    novels.sort((a, b) => {
+      const aVal = a[sortBy] ?? "";
+      const bVal = b[sortBy] ?? "";
+      const cmp =
+        typeof aVal === "number" && typeof bVal === "number"
+          ? aVal - bVal
+          : String(aVal).localeCompare(String(bVal));
+      return sortOrder === "desc" ? -cmp : cmp;
+    });
 
     const total = novels.length;
     const paginated = novels.slice((page - 1) * limit, page * limit);
@@ -441,10 +456,13 @@ export async function listNovels(params: {
   const total = totalCount.data().count;
 
   // Apply ordering and pagination
+  const sortBy = params.sort_by || "created_at";
+  const sortOrder = params.sort_order || "desc";
+
   // Note: Firestore requires composite index for where + orderBy on different fields
   // For translator_id queries, we skip orderBy to avoid index issues
   if (!params.translator_id) {
-    query = query.orderBy("updated_at", "desc");
+    query = query.orderBy(sortBy, sortOrder);
   }
 
   if (page > 1) {
@@ -456,7 +474,17 @@ export async function listNovels(params: {
 
   // Sort manually when translator_id filter is used
   if (params.translator_id) {
-    novels.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    const sortBy = params.sort_by || "created_at";
+    const sortOrder = params.sort_order || "desc";
+    novels.sort((a, b) => {
+      const aVal = a[sortBy] ?? "";
+      const bVal = b[sortBy] ?? "";
+      const cmp =
+        typeof aVal === "number" && typeof bVal === "number"
+          ? aVal - bVal
+          : String(aVal).localeCompare(String(bVal));
+      return sortOrder === "desc" ? -cmp : cmp;
+    });
   }
 
   return { items: novels, page, limit, total };

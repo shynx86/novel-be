@@ -76,13 +76,28 @@ adminNovels.post("/", async (c) => {
 adminNovels.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
   const status = c.req.query("status");
+  const sortBy = c.req.query("sort_by") as
+    | "created_at"
+    | "updated_at"
+    | "title"
+    | "views"
+    | "rating"
+    | undefined;
+  const sortOrder = c.req.query("sort_order") as "asc" | "desc" | undefined;
   const userId = c.get("userId") as string;
   const userRole = c.get("userRole") as string;
 
   // Translator only sees their own novels
   const translatorId = userRole === "translator" ? userId : undefined;
 
-  const result = await listNovels({ page, limit, status, translator_id: translatorId });
+  const result = await listNovels({
+    page,
+    limit,
+    status,
+    translator_id: translatorId,
+    sort_by: sortBy,
+    sort_order: sortOrder,
+  });
   return c.json({ data: result }, 200);
 });
 
