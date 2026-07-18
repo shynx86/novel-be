@@ -17,6 +17,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     comment_count: data.comment_count ?? 0,
     slug: data.slug || id,
     price: data.price ?? null,
+    is_featured: data.is_featured ?? false,
     created_at: data.created_at,
     updated_at: data.updated_at,
   };

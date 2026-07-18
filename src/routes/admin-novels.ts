@@ -162,6 +162,25 @@ adminNovels.delete("/:novelId", async (c) => {
   return c.json({ data: { deleted: true } }, 200);
 });
 
+// PATCH /api/admin/novels/:novelId/featured
+adminNovels.patch("/:novelId/featured", async (c) => {
+  const novelId = c.req.param("novelId");
+  const body = await c.req.json();
+  const userRole = c.get("userRole") as string;
+
+  // Only admin can toggle featured
+  if (userRole !== "admin") {
+    throw new ForbiddenError("Only admins can toggle featured status");
+  }
+
+  if (typeof body.is_featured !== "boolean") {
+    throw new ValidationError("is_featured must be a boolean", { field: "is_featured" });
+  }
+
+  const novel = await updateNovel(novelId, { is_featured: body.is_featured });
+  return c.json({ data: novel }, 200);
+});
+
 // Chapter routes
 
 // POST /api/admin/novels/:novelId/chapters

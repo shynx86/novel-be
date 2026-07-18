@@ -25,6 +25,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     followers: data.followers ?? 0,
     comment_count: data.comment_count ?? 0,
     price: data.price ?? null,
+    is_featured: data.is_featured ?? false,
     translator_id: data.translator_id ?? undefined,
     created_at: data.created_at,
     updated_at: data.updated_at,
@@ -79,6 +80,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     followers: input.followers ?? 0,
     comment_count: 0,
     price: input.price !== undefined ? input.price : null,
+    is_featured: false,
     created_at: now,
     updated_at: now,
   };
@@ -190,6 +192,42 @@ export async function getCompletedNovels(limit = 10): Promise<NovelDocument[]> {
     .collection("novels")
     .where("status", "==", "completed")
     .orderBy("updated_at", "desc")
+    .limit(limit)
+    .get();
+  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  return Promise.all(novels.map(enrichNovelWithRelations));
+}
+
+export async function getFeaturedNovels(limit = 10): Promise<NovelDocument[]> {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection("novels")
+    .where("is_featured", "==", true)
+    .orderBy("views", "desc")
+    .limit(limit)
+    .get();
+  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  return Promise.all(novels.map(enrichNovelWithRelations));
+}
+
+export async function getCompletedFeaturedNovels(limit = 10): Promise<NovelDocument[]> {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection("novels")
+    .where("status", "==", "completed")
+    .where("is_featured", "==", true)
+    .orderBy("views", "desc")
+    .limit(limit)
+    .get();
+  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  return Promise.all(novels.map(enrichNovelWithRelations));
+}
+
+export async function getNewestNovels(limit = 10): Promise<NovelDocument[]> {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection("novels")
+    .orderBy("created_at", "desc")
     .limit(limit)
     .get();
   const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
@@ -341,6 +379,7 @@ export async function updateNovel(
   if (input.views !== undefined) updates.views = input.views;
   if (input.followers !== undefined) updates.followers = input.followers;
   if (input.price !== undefined) updates.price = input.price;
+  if (input.is_featured !== undefined) updates.is_featured = input.is_featured;
   if (input.translator_id !== undefined) updates.translator_id = input.translator_id;
 
   await db.collection("novels").doc(novelId).update(updates);

@@ -102,6 +102,7 @@ export async function listFavorites(
             comment_count: novelData.comment_count ?? 0,
             slug: novelData.slug || novelDoc.id,
             price: novelData.price ?? null,
+            is_featured: novelData.is_featured ?? false,
             created_at: novelData.created_at,
             updated_at: novelData.updated_at,
           }
