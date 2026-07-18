@@ -179,114 +179,136 @@ export async function getRelatedNovels(
   );
 }
 
+function getOrderByValue(novel: NovelDocument, field: string): string {
+  const record = novel as unknown as Record<string, unknown>;
+  const val = record[field];
+  return val == null ? "" : String(val);
+}
+
+function matchesFilters(
+  novel: NovelDocument,
+  filters: { field: string; value: string | boolean }[],
+): boolean {
+  const record = novel as unknown as Record<string, unknown>;
+  for (const f of filters) {
+    if (record[f.field] !== f.value) return false;
+  }
+  return true;
+}
+
+async function searchNovels(params: {
+  search?: string;
+  filters?: { field: string; value: string | boolean }[];
+  orderByField: string;
+  page: number;
+  limit: number;
+}): Promise<PaginatedResult<NovelDocument>> {
+  const db = getFirestore();
+  const { search, filters, orderByField, page, limit } = params;
+
+  if (!search) {
+    let query: admin.firestore.Query = db.collection("novels");
+    for (const f of filters ?? []) {
+      query = query.where(f.field, "==", f.value);
+    }
+    query = query.orderBy(orderByField, "desc");
+
+    const totalCount = await query.count().get();
+    const total = totalCount.data().count;
+
+    if (page > 1) {
+      query = query.offset((page - 1) * limit);
+    }
+
+    const snapshot = await query.limit(limit).get();
+    const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+    const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
+    return { items: enriched, page, limit, total };
+  }
+
+  const lowerSearch = search.toLowerCase();
+  let query: admin.firestore.Query = db
+    .collection("novels")
+    .orderBy("title")
+    .startAt(lowerSearch)
+    .endAt(`${lowerSearch}\uf8ff`);
+
+  const snapshot = await query.get();
+  let novels = snapshot.docs
+    .map((doc) => novelDocToData(doc.id, doc.data()))
+    .filter((novel) => matchesFilters(novel, filters ?? []));
+
+  novels.sort((a, b) => {
+    const aVal = getOrderByValue(a, orderByField);
+    const bVal = getOrderByValue(b, orderByField);
+    return bVal.localeCompare(aVal);
+  });
+
+  const total = novels.length;
+  const paginated = novels.slice((page - 1) * limit, page * limit);
+  const enriched = await Promise.all(paginated.map(enrichNovelWithRelations));
+  return { items: enriched, page, limit, total };
+}
+
 export async function getTrendingNovels(
   page = 1,
   limit = 10,
+  search?: string,
 ): Promise<PaginatedResult<NovelDocument>> {
-  const db = getFirestore();
-  let query: admin.firestore.Query = db.collection("novels").orderBy("views", "desc");
-
-  const totalCount = await query.count().get();
-  const total = totalCount.data().count;
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
-  const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
-  return { items: enriched, page, limit, total };
+  return searchNovels({ search, orderByField: "views", page, limit });
 }
 
 export async function getCompletedNovels(
   page = 1,
   limit = 10,
+  search?: string,
 ): Promise<PaginatedResult<NovelDocument>> {
-  const db = getFirestore();
-  let query: admin.firestore.Query = db
-    .collection("novels")
-    .where("status", "==", "completed")
-    .orderBy("updated_at", "desc");
-
-  const totalCount = await query.count().get();
-  const total = totalCount.data().count;
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
-  const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
-  return { items: enriched, page, limit, total };
+  return searchNovels({
+    search,
+    filters: [{ field: "status", value: "completed" }],
+    orderByField: "updated_at",
+    page,
+    limit,
+  });
 }
 
 export async function getFeaturedNovels(
   page = 1,
   limit = 10,
+  search?: string,
 ): Promise<PaginatedResult<NovelDocument>> {
-  const db = getFirestore();
-  let query: admin.firestore.Query = db
-    .collection("novels")
-    .where("is_featured", "==", true)
-    .orderBy("views", "desc");
-
-  const totalCount = await query.count().get();
-  const total = totalCount.data().count;
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
-  const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
-  return { items: enriched, page, limit, total };
+  return searchNovels({
+    search,
+    filters: [{ field: "is_featured", value: true }],
+    orderByField: "views",
+    page,
+    limit,
+  });
 }
 
 export async function getCompletedFeaturedNovels(
   page = 1,
   limit = 10,
+  search?: string,
 ): Promise<PaginatedResult<NovelDocument>> {
-  const db = getFirestore();
-  let query: admin.firestore.Query = db
-    .collection("novels")
-    .where("status", "==", "completed")
-    .where("is_featured", "==", true)
-    .orderBy("views", "desc");
-
-  const totalCount = await query.count().get();
-  const total = totalCount.data().count;
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
-  const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
-  return { items: enriched, page, limit, total };
+  return searchNovels({
+    search,
+    filters: [
+      { field: "status", value: "completed" },
+      { field: "is_featured", value: true },
+    ],
+    orderByField: "views",
+    page,
+    limit,
+  });
 }
 
 export async function getNewestNovels(
   page = 1,
   limit = 10,
+  search?: string,
 ): Promise<PaginatedResult<NovelDocument>> {
-  const db = getFirestore();
-  let query: admin.firestore.Query = db.collection("novels").orderBy("created_at", "desc");
-
-  const totalCount = await query.count().get();
-  const total = totalCount.data().count;
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
-  const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
-  return { items: enriched, page, limit, total };
+  return searchNovels({ search, orderByField: "created_at", page, limit });
 }
 
 export async function listNovels(params: {
@@ -296,6 +318,7 @@ export async function listNovels(params: {
   author_id?: string;
   translator_id?: string;
   genre_id?: string;
+  search?: string;
 }): Promise<PaginatedResult<NovelDocument>> {
   const db = getFirestore();
   const page = params.page || 1;
@@ -379,6 +402,30 @@ export async function listNovels(params: {
   }
 
   // Standard query without junction filters
+  if (params.search) {
+    const lowerSearch = params.search.toLowerCase();
+    let query: admin.firestore.Query = db
+      .collection("novels")
+      .orderBy("title")
+      .startAt(lowerSearch)
+      .endAt(`${lowerSearch}\uf8ff`);
+
+    const snapshot = await query.get();
+    let novels = snapshot.docs
+      .map((doc) => novelDocToData(doc.id, doc.data()))
+      .filter((novel) => {
+        if (params.status && novel.status !== params.status) return false;
+        if (params.translator_id && novel.translator_id !== params.translator_id) return false;
+        return true;
+      });
+
+    novels.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+
+    const total = novels.length;
+    const paginated = novels.slice((page - 1) * limit, page * limit);
+    return { items: paginated, page, limit, total };
+  }
+
   let query: admin.firestore.Query = db.collection("novels");
 
   if (params.status) {
