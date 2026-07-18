@@ -70,45 +70,46 @@ export async function listFavorites(
     .offset((page - 1) * limit)
     .get();
 
-  const totalCount = await db.collection("users").doc(userId).collection("favorites").count().get();
-
-  const total = totalCount.data().count;
-
   // Batch fetch novel details
   const novelIds = snapshot.docs.map((doc) => doc.id);
   const novelRefs = novelIds.map((id) => db.collection("novels").doc(id));
   const novelDocs = await db.getAll(...novelRefs);
 
-  const favorites: FavoriteWithNovel[] = snapshot.docs.map((doc, i) => {
-    const data = doc.data();
-    const novelDoc = novelDocs[i];
-    const novelData = novelDoc.exists ? novelDoc.data() : null;
+  const favorites: FavoriteWithNovel[] = snapshot.docs
+    .map((doc, i) => {
+      const data = doc.data();
+      const novelDoc = novelDocs[i];
+      const novelData = novelDoc.exists ? novelDoc.data() : null;
 
-    return {
-      novel_id: data.novel_id,
-      added_at: data.added_at,
-      novel: novelData
-        ? {
-            id: novelDoc.id,
-            title: novelData.title,
-            description: novelData.description,
-            cover_url: novelData.cover_url,
-            status: novelData.status,
-            chapter_count: novelData.chapter_count || 0,
-            total_word_count: novelData.total_word_count || 0,
-            rating: novelData.rating ?? 0,
-            views: novelData.views ?? 0,
-            followers: novelData.followers ?? 0,
-            comment_count: novelData.comment_count ?? 0,
-            slug: novelData.slug || novelDoc.id,
-            price: novelData.price ?? null,
-            is_featured: novelData.is_featured ?? false,
-            created_at: novelData.created_at,
-            updated_at: novelData.updated_at,
-          }
-        : null,
-    };
-  });
+      return {
+        novel_id: data.novel_id,
+        added_at: data.added_at,
+        novel: novelData
+          ? {
+              id: novelDoc.id,
+              title: novelData.title,
+              description: novelData.description,
+              cover_url: novelData.cover_url,
+              status: novelData.status,
+              publication_status: (novelData.publication_status === "draft"
+                ? "draft"
+                : "public") as NovelDocument["publication_status"],
+              chapter_count: novelData.chapter_count || 0,
+              total_word_count: novelData.total_word_count || 0,
+              rating: novelData.rating ?? 0,
+              views: novelData.views ?? 0,
+              followers: novelData.followers ?? 0,
+              comment_count: novelData.comment_count ?? 0,
+              slug: novelData.slug || novelDoc.id,
+              price: novelData.price ?? null,
+              is_featured: novelData.is_featured ?? false,
+              created_at: novelData.created_at,
+              updated_at: novelData.updated_at,
+            }
+          : null,
+      };
+    })
+    .filter((favorite) => favorite.novel?.publication_status === "public");
 
-  return { items: favorites, page, limit, total };
+  return { items: favorites, page, limit, total: favorites.length };
 }

@@ -9,11 +9,11 @@ import {
   getCompletedNovels,
   getFeaturedNovels,
   getNewestNovels,
-  getNovel,
-  getNovelBySlug,
+  getPublicNovel,
+  getPublicNovelBySlug,
   getRelatedNovels,
   getTrendingNovels,
-  listNovels,
+  listPublicNovels,
   listNovelsForSitemap,
 } from "../services/novel.js";
 import { checkSubscriptionAccess, getUserSubscriptionsForNovel } from "../services/subscription.js";
@@ -77,7 +77,7 @@ novels.get("/newest", async (c) => {
 // GET /api/novels/by-slug/:slug
 novels.get("/by-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
-  const novel = await getNovelBySlug(slug);
+  const novel = await getPublicNovelBySlug(slug);
   const enriched = await enrichNovelWithRelations(novel);
   return c.json({ data: enriched }, 200);
 });
@@ -91,7 +91,7 @@ novels.get("/", async (c) => {
   const genreId = c.req.query("genre_id");
   const search = c.req.query("search") || undefined;
 
-  const result = await listNovels({
+  const result = await listPublicNovels({
     page,
     limit,
     status,
@@ -106,7 +106,7 @@ novels.get("/", async (c) => {
 // GET /api/novels/:novelId
 novels.get("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
-  const novel = await getNovel(novelId);
+  const novel = await getPublicNovel(novelId);
   const enriched = await enrichNovelWithRelations(novel);
   return c.json({ data: enriched }, 200);
 });
@@ -116,6 +116,7 @@ novels.get("/:novelId/related", async (c) => {
   const novelId = c.req.param("novelId");
   const genreIndex = Math.max(0, Number(c.req.query("genre_index") || 0));
   const limit = Math.min(Number(c.req.query("limit") || 10), 50);
+  await getPublicNovel(novelId);
   const result = await getRelatedNovels(novelId, genreIndex, limit);
   return c.json({ data: result }, 200);
 });
@@ -125,6 +126,7 @@ novels.get("/:novelId/chapters", optionalAuthMiddleware, async (c) => {
   const novelId = c.req.param("novelId");
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
 
+  await getPublicNovel(novelId);
   const result = await listChapters(novelId, { page, limit, includeContent: false });
 
   // If user is authenticated, annotate with subscription status
@@ -154,6 +156,7 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
   const index = Number(c.req.param("index"));
   const userId = c.get("userId") as string | undefined;
 
+  await getPublicNovel(novelId);
   const chapter = await getChapter(novelId, index);
 
   switch (chapter.access_type) {
@@ -173,7 +176,7 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
 
       const hasAccess = await checkSubscriptionAccess(userId, novelId, index);
       if (!hasAccess) {
-        const novel = await getNovel(novelId);
+        const novel = await getPublicNovel(novelId);
         throw new ForbiddenError("You have not subscribed to this chapter", {
           chapter_price: chapter.price,
           novel_price: novel.price,
@@ -188,6 +191,7 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
 // POST /api/novels/:novelId/views — increment view count
 novels.post("/:novelId/views", async (c) => {
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
   const db = getFirestore();
   await db
     .collection("novels")

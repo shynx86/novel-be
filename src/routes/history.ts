@@ -6,6 +6,7 @@ import {
   updateReadingProgress,
 } from "../services/history.js";
 import { parsePagination } from "../utils/pagination.js";
+import { getPublicNovel } from "../services/novel.js";
 
 type Variables = {
   user: unknown;
@@ -27,6 +28,7 @@ history.get("/", authMiddleware, async (c) => {
 history.post("/:novelId", authMiddleware, async (c) => {
   const userId = c.get("userId");
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
   const body = await c.req.json();
 
   if (typeof body.chapterIndex !== "number" || body.chapterIndex < 1) {

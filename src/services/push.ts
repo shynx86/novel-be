@@ -13,6 +13,7 @@ interface NovelMetaInput {
   description?: string;
   cover_url?: string;
   status?: string;
+  publication_status?: "draft" | "public";
   authors?: { name: string; slug?: string }[];
   genres?: { name: string; slug?: string }[];
 }
@@ -152,6 +153,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
   };
 
   if (!existingNovel.exists) {
+    novelData.publication_status = input.publication_status || "draft";
     novelData.chapter_count = 0;
     novelData.total_word_count = 0;
     novelData.rating = 0;
@@ -231,6 +233,9 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
     description: input.description ?? "",
     cover_url: input.cover_url ?? "",
     status: mapStatus(input.status),
+    publication_status:
+      input.publication_status ??
+      (existingNovel.data()?.publication_status === "draft" ? "draft" : "public"),
     chapter_count: (existingNovel.data()?.chapter_count as number) ?? 0,
     total_word_count: (existingNovel.data()?.total_word_count as number) ?? 0,
     rating: (existingNovel.data()?.rating as number) ?? 0,

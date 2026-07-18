@@ -18,6 +18,8 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     description: data.description,
     cover_url: data.cover_url,
     status: data.status,
+    // Documents created before this field existed remain publicly available.
+    publication_status: data.publication_status === "draft" ? "draft" : "public",
     chapter_count: data.chapter_count || 0,
     total_word_count: data.total_word_count || 0,
     rating: data.rating ?? 0,
@@ -73,6 +75,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     description: input.description || "",
     cover_url: input.cover_url || "",
     status: input.status || "ongoing",
+    publication_status: input.publication_status || "draft",
     chapter_count: 0,
     total_word_count: 0,
     rating: input.rating ?? 0,
@@ -108,6 +111,18 @@ export async function getNovel(novelId: string): Promise<NovelDocument> {
   return novelDocToData(doc.id, data);
 }
 
+export function isPublicNovel(novel: NovelDocument): boolean {
+  return novel.publication_status === "public";
+}
+
+export async function getPublicNovel(novelId: string): Promise<NovelDocument> {
+  const novel = await getNovel(novelId);
+  if (!isPublicNovel(novel)) {
+    throw new NotFoundError("Novel not found");
+  }
+  return novel;
+}
+
 export async function getNovelBySlug(slug: string): Promise<NovelDocument> {
   const db = getFirestore();
   const snapshot = await db.collection("novels").where("slug", "==", slug).limit(1).get();
@@ -120,6 +135,14 @@ export async function getNovelBySlug(slug: string): Promise<NovelDocument> {
   return novelDocToData(doc.id, doc.data());
 }
 
+export async function getPublicNovelBySlug(slug: string): Promise<NovelDocument> {
+  const novel = await getNovelBySlug(slug);
+  if (!isPublicNovel(novel)) {
+    throw new NotFoundError("Novel not found");
+  }
+  return novel;
+}
+
 export async function listNovelsForSitemap(): Promise<
   { id: string; slug: string; chapter_count: number; updated_at: string }[]
 > {
@@ -129,12 +152,15 @@ export async function listNovelsForSitemap(): Promise<
     .select("slug", "chapter_count", "updated_at")
     .get();
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    slug: doc.data().slug || doc.id,
-    chapter_count: doc.data().chapter_count || 0,
-    updated_at: doc.data().updated_at,
-  }));
+  return snapshot.docs
+    .map((doc) => novelDocToData(doc.id, doc.data()))
+    .filter(isPublicNovel)
+    .map((novel) => ({
+      id: novel.id,
+      slug: novel.slug,
+      chapter_count: novel.chapter_count,
+      updated_at: novel.updated_at,
+    }));
 }
 
 export async function getRelatedNovels(
@@ -157,13 +183,11 @@ export async function getRelatedNovels(
   const novelGenreSnapshot = await db
     .collection("novel_genres")
     .where("genre_id", "==", targetGenreId)
-    .limit(limit + 1)
     .get();
 
   const relatedNovelIds = novelGenreSnapshot.docs
     .map((d) => d.data().novel_id as string)
-    .filter((id) => id !== novelId)
-    .slice(0, limit);
+    .filter((id) => id !== novelId);
 
   if (relatedNovelIds.length === 0) return [];
 
@@ -176,6 +200,8 @@ export async function getRelatedNovels(
       .filter((doc) => doc.exists && doc.data())
       // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
       .map((doc) => novelDocToData(doc.id, doc.data()!))
+      .filter(isPublicNovel)
+      .slice(0, limit)
   );
 }
 
@@ -213,15 +239,12 @@ async function searchNovels(params: {
     }
     query = query.orderBy(orderByField, "desc");
 
-    const totalCount = await query.count().get();
-    const total = totalCount.data().count;
-
-    if (page > 1) {
-      query = query.offset((page - 1) * limit);
-    }
-
-    const snapshot = await query.limit(limit).get();
-    const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+    const snapshot = await query.get();
+    const allNovels = snapshot.docs
+      .map((doc) => novelDocToData(doc.id, doc.data()))
+      .filter(isPublicNovel);
+    const total = allNovels.length;
+    const novels = allNovels.slice((page - 1) * limit, page * limit);
     const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
     return { items: enriched, page, limit, total };
   }
@@ -236,6 +259,7 @@ async function searchNovels(params: {
   const snapshot = await query.get();
   let novels = snapshot.docs
     .map((doc) => novelDocToData(doc.id, doc.data()))
+    .filter(isPublicNovel)
     .filter((novel) => matchesFilters(novel, filters ?? []));
 
   novels.sort((a, b) => {
@@ -318,6 +342,7 @@ export async function listNovels(params: {
   page?: number;
   limit?: number;
   status?: string;
+  publication_status?: string;
   author_id?: string;
   translator_id?: string;
   genre_id?: string;
@@ -388,6 +413,17 @@ export async function listNovels(params: {
       filteredIds = novelIds.filter((id) => statusIds.has(id));
     }
 
+    if (params.publication_status) {
+      const novelRefs = filteredIds.map((id) => db.collection("novels").doc(id));
+      const novelDocs = await db.getAll(...novelRefs);
+      filteredIds = novelDocs
+        .filter((doc) => doc.exists && doc.data())
+        // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
+        .map((doc) => novelDocToData(doc.id, doc.data()!))
+        .filter((novel) => novel.publication_status === params.publication_status)
+        .map((novel) => novel.id);
+    }
+
     const total = filteredIds.length;
     const paginatedIds = filteredIds.slice((page - 1) * limit, page * limit);
 
@@ -420,6 +456,7 @@ export async function listNovels(params: {
       .map((doc) => novelDocToData(doc.id, doc.data()))
       .filter((novel) => {
         if (params.status && novel.status !== params.status) return false;
+        if (params.publication_status && novel.publication_status !== params.publication_status) return false;
         if (params.translator_id && novel.translator_id !== params.translator_id) return false;
         return true;
       });
@@ -449,6 +486,26 @@ export async function listNovels(params: {
 
   if (params.translator_id) {
     query = query.where("translator_id", "==", params.translator_id);
+  }
+
+  if (params.publication_status) {
+    const snapshot = await query.get();
+    const novels = snapshot.docs
+      .map((doc) => novelDocToData(doc.id, doc.data()))
+      .filter((novel) => novel.publication_status === params.publication_status);
+    const sortBy = params.sort_by || "created_at";
+    const sortOrder = params.sort_order || "desc";
+    novels.sort((a, b) => {
+      const aVal = a[sortBy] ?? "";
+      const bVal = b[sortBy] ?? "";
+      const cmp =
+        typeof aVal === "number" && typeof bVal === "number"
+          ? aVal - bVal
+          : String(aVal).localeCompare(String(bVal));
+      return sortOrder === "desc" ? -cmp : cmp;
+    });
+    const total = novels.length;
+    return { items: novels.slice((page - 1) * limit, page * limit), page, limit, total };
   }
 
   // Get total count
@@ -490,6 +547,58 @@ export async function listNovels(params: {
   return { items: novels, page, limit, total };
 }
 
+export async function listPublicNovels(params: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  author_id?: string;
+  translator_id?: string;
+  genre_id?: string;
+  search?: string;
+}): Promise<PaginatedResult<NovelDocument>> {
+  const db = getFirestore();
+  const page = params.page || 1;
+  const limit = Math.min(params.limit || 20, 100);
+  let novels = (await db.collection("novels").get()).docs
+    .map((doc) => novelDocToData(doc.id, doc.data()))
+    .filter(isPublicNovel);
+
+  if (params.status) novels = novels.filter((novel) => novel.status === params.status);
+  if (params.translator_id) {
+    novels = novels.filter((novel) => novel.translator_id === params.translator_id);
+  }
+  if (params.search) {
+    const search = params.search.toLowerCase();
+    novels = novels.filter((novel) => novel.title.toLowerCase().includes(search));
+  }
+
+  if (params.author_id || params.genre_id) {
+    const [authorSnapshot, genreSnapshot] = await Promise.all([
+      params.author_id
+        ? db.collection("novel_authors").where("author_id", "==", params.author_id).get()
+        : undefined,
+      params.genre_id
+        ? db.collection("novel_genres").where("genre_id", "==", params.genre_id).get()
+        : undefined,
+    ]);
+    const authorIds = authorSnapshot
+      ? new Set(authorSnapshot.docs.map((doc) => doc.data().novel_id as string))
+      : undefined;
+    const genreIds = genreSnapshot
+      ? new Set(genreSnapshot.docs.map((doc) => doc.data().novel_id as string))
+      : undefined;
+    novels = novels.filter(
+      (novel) => (!authorIds || authorIds.has(novel.id)) && (!genreIds || genreIds.has(novel.id)),
+    );
+  }
+
+  novels.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const total = novels.length;
+  const items = novels.slice((page - 1) * limit, page * limit);
+  const enriched = await Promise.all(items.map(enrichNovelWithRelations));
+  return { items: enriched, page, limit, total };
+}
+
 export async function updateNovel(
   novelId: string,
   input: NovelUpdateInput,
@@ -505,6 +614,7 @@ export async function updateNovel(
   if (input.description !== undefined) updates.description = input.description;
   if (input.cover_url !== undefined) updates.cover_url = input.cover_url;
   if (input.status !== undefined) updates.status = input.status;
+  if (input.publication_status !== undefined) updates.publication_status = input.publication_status;
   if (input.rating !== undefined) updates.rating = input.rating;
   if (input.views !== undefined) updates.views = input.views;
   if (input.followers !== undefined) updates.followers = input.followers;

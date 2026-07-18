@@ -31,6 +31,7 @@ adminPush.post("/novel-meta", async (c) => {
     description: body.description,
     cover_url: body.cover_url,
     status: body.status,
+    publication_status: body.publication_status,
     authors: body.authors,
     genres: body.genres,
   });
