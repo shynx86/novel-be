@@ -153,13 +153,15 @@ export async function createChapter(
 
     const nextIndex = existingChapters.empty ? 1 : (existingChapters.docs[0].data().index || 0) + 1;
 
+    const accessType = input.access_type ?? (nextIndex <= 10 ? "free" : "free_auth");
+
     const chapterData = {
       index: nextIndex,
       title: input.title,
       content: input.content,
       word_count: wordCount,
-      access_type: input.access_type,
-      price: input.access_type === "paid" ? input.price || 0 : 0,
+      access_type: accessType,
+      price: accessType === "paid" ? input.price || 0 : 0,
       created_at: now,
       updated_at: now,
     };

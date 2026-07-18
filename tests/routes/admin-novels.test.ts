@@ -273,4 +273,54 @@ describe("POST /api/admin/novels/:novelId/chapters", () => {
 
     expect(res.status).toBe(400);
   });
+
+  it("auto-assigns free for chapters 1-10 when access_type is not provided", async () => {
+    setupAdminAuth();
+    mockTransactionGet.mockResolvedValue({ empty: true, docs: [] });
+    mockTransactionSet.mockResolvedValue(undefined);
+    mockTransactionUpdate.mockResolvedValue(undefined);
+
+    const res = await app.request("/api/admin/novels/novel-1/chapters", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "Chapter 1",
+        content: "Some content here",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.data.access_type).toBe("free");
+  });
+
+  it("auto-assigns free_auth for chapters 11+ when access_type is not provided", async () => {
+    setupAdminAuth();
+    // Simulate 10 existing chapters
+    mockTransactionGet.mockResolvedValue({
+      empty: false,
+      docs: [{ data: () => ({ index: 10 }) }],
+    });
+    mockTransactionSet.mockResolvedValue(undefined);
+    mockTransactionUpdate.mockResolvedValue(undefined);
+
+    const res = await app.request("/api/admin/novels/novel-1/chapters", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "Chapter 11",
+        content: "Some content here",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.data.access_type).toBe("free_auth");
+  });
 });

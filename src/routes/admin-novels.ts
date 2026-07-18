@@ -204,7 +204,7 @@ adminNovels.post("/:novelId/chapters", async (c) => {
   if (!body.content || typeof body.content !== "string") {
     throw new ValidationError("content is required", { field: "content" });
   }
-  if (!body.access_type || !["free", "free_auth", "paid"].includes(body.access_type)) {
+  if (body.access_type !== undefined && !["free", "free_auth", "paid"].includes(body.access_type)) {
     throw new ValidationError("access_type must be one of: free, free_auth, paid", {
       field: "access_type",
     });

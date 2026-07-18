@@ -16,6 +16,7 @@
     "start": "node --env-file=.env dist/adapters/standalone/index.js",
     "seed:genres": "tsx scripts/seed-genres.ts",
     "seed:all": "tsx scripts/seed-all.ts",
+    "migrate:chapter-access-type": "tsx scripts/migrate-chapter-access-type.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -67,7 +67,7 @@ export interface ChapterDocument {
 export interface ChapterCreateInput {
   title: string;
   content: string;
-  access_type: ChapterAccessType;
+  access_type?: ChapterAccessType;
   price?: number;
 }
 
