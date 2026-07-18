@@ -37,35 +37,40 @@ novels.get("/sitemap", async (c) => {
 // GET /api/novels/trending
 novels.get("/trending", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
-  const result = await getTrendingNovels(page, limit);
+  const search = c.req.query("search") || undefined;
+  const result = await getTrendingNovels(page, limit, search);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/completed
 novels.get("/completed", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
-  const result = await getCompletedNovels(page, limit);
+  const search = c.req.query("search") || undefined;
+  const result = await getCompletedNovels(page, limit, search);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/featured
 novels.get("/featured", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
-  const result = await getFeaturedNovels(page, limit);
+  const search = c.req.query("search") || undefined;
+  const result = await getFeaturedNovels(page, limit, search);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/completed-featured
 novels.get("/completed-featured", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
-  const result = await getCompletedFeaturedNovels(page, limit);
+  const search = c.req.query("search") || undefined;
+  const result = await getCompletedFeaturedNovels(page, limit, search);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/newest
 novels.get("/newest", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
-  const result = await getNewestNovels(page, limit);
+  const search = c.req.query("search") || undefined;
+  const result = await getNewestNovels(page, limit, search);
   return c.json({ data: result }, 200);
 });
 
@@ -84,6 +89,7 @@ novels.get("/", async (c) => {
   const authorId = c.req.query("author_id");
   const translatorId = c.req.query("translator_id");
   const genreId = c.req.query("genre_id");
+  const search = c.req.query("search") || undefined;
 
   const result = await listNovels({
     page,
@@ -92,6 +98,7 @@ novels.get("/", async (c) => {
     author_id: authorId,
     translator_id: translatorId,
     genre_id: genreId,
+    search,
   });
   return c.json({ data: result }, 200);
 });
