@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import { createComment, deleteComment, likeComment, listComments } from "../services/comment.js";
 import { parsePagination } from "../utils/pagination.js";
+import { getPublicNovel } from "../services/novel.js";
 
 type Variables = {
   user: unknown;
@@ -13,6 +14,7 @@ const comments = new Hono<{ Variables: Variables }>();
 // GET /api/novels/:novelId/comments
 comments.get("/:novelId/comments", async (c) => {
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 50);
 
   const result = await listComments(novelId, { page, limit });
@@ -22,6 +24,7 @@ comments.get("/:novelId/comments", async (c) => {
 // POST /api/novels/:novelId/comments
 comments.post("/:novelId/comments", authMiddleware, async (c) => {
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
   const userId = c.get("userId");
   const body = await c.req.json();
 
@@ -40,6 +43,7 @@ comments.post("/:novelId/comments", authMiddleware, async (c) => {
 // DELETE /api/novels/:novelId/comments/:commentId
 comments.delete("/:novelId/comments/:commentId", authMiddleware, async (c) => {
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
   const commentId = c.req.param("commentId");
   const userId = c.get("userId");
 
@@ -50,6 +54,7 @@ comments.delete("/:novelId/comments/:commentId", authMiddleware, async (c) => {
 // POST /api/novels/:novelId/comments/:commentId/like
 comments.post("/:novelId/comments/:commentId/like", async (c) => {
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
   const commentId = c.req.param("commentId");
 
   const comment = await likeComment(novelId, commentId);

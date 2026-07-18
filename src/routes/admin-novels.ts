@@ -42,6 +42,16 @@ adminNovels.post("/", async (c) => {
   if (!body.title || typeof body.title !== "string") {
     throw new ValidationError("title is required", { field: "title" });
   }
+  if (
+    userRole === "admin" &&
+    body.publication_status !== undefined &&
+    body.publication_status !== "draft" &&
+    body.publication_status !== "public"
+  ) {
+    throw new ValidationError("publication_status must be draft or public", {
+      field: "publication_status",
+    });
+  }
 
   // Translator automatically becomes the translator of the novel
   const translatorId = isTranslator ? userId : body.translator_id;
@@ -57,6 +67,7 @@ adminNovels.post("/", async (c) => {
     description: body.description,
     cover_url: body.cover_url,
     status: body.status,
+    publication_status: userRole === "admin" ? body.publication_status : undefined,
     price: body.price,
     translator_id: translatorId,
   });
@@ -76,6 +87,7 @@ adminNovels.post("/", async (c) => {
 adminNovels.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
   const status = c.req.query("status");
+  const publicationStatus = c.req.query("publication_status");
   const sortBy = c.req.query("sort_by") as
     | "created_at"
     | "updated_at"
@@ -94,6 +106,7 @@ adminNovels.get("/", async (c) => {
     page,
     limit,
     status,
+    publication_status: publicationStatus,
     translator_id: translatorId,
     sort_by: sortBy,
     sort_order: sortOrder,
@@ -125,6 +138,17 @@ adminNovels.patch("/:novelId", async (c) => {
   const userId = c.get("userId") as string;
   const userRole = c.get("userRole") as string;
 
+  if (
+    userRole === "admin" &&
+    body.publication_status !== undefined &&
+    body.publication_status !== "draft" &&
+    body.publication_status !== "public"
+  ) {
+    throw new ValidationError("publication_status must be draft or public", {
+      field: "publication_status",
+    });
+  }
+
   // Check access for translator
   if (userRole === "translator") {
     const existingNovel = await getNovel(novelId);
@@ -138,6 +162,10 @@ adminNovels.patch("/:novelId", async (c) => {
     description: body.description,
     cover_url: body.cover_url,
     status: body.status,
+    // Publication is an admin-only decision; translators can prepare drafts.
+    ...(userRole === "admin" && body.publication_status !== undefined
+      ? { publication_status: body.publication_status }
+      : {}),
     price: body.price,
   };
 

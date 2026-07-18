@@ -9,7 +9,7 @@ import {
 import { logger } from "../utils/logger.js";
 import { getChapter } from "./chapter.js";
 import { getFirestore } from "./firebase.js";
-import { getNovel } from "./novel.js";
+import { getPublicNovel } from "./novel.js";
 
 function buildSubscriptionId(userId: string, novelId: string, chapterIndex: number): string {
   return `${userId}::${novelId}::${chapterIndex}`;
@@ -81,6 +81,7 @@ export async function subscribeChapter(
   chapterIndex: number,
 ): Promise<{ subscription: SubscriptionDocument; credits_remaining: number }> {
   const db = getFirestore();
+  await getPublicNovel(novelId);
 
   // Validate chapter exists and is paid
   const chapter = await getChapter(novelId, chapterIndex);
@@ -169,7 +170,7 @@ export async function subscribeNovel(
   const db = getFirestore();
 
   // Validate novel exists and has a price
-  const novel = await getNovel(novelId);
+  const novel = await getPublicNovel(novelId);
   if (novel.price === null || novel.price <= 0) {
     throw new ValidationError("This novel is not available for whole-novel subscription");
   }
@@ -276,7 +277,7 @@ export async function checkAccess(
   novel_price?: number | null;
 }> {
   const chapter = await getChapter(novelId, chapterIndex);
-  const novel = await getNovel(novelId);
+  const novel = await getPublicNovel(novelId);
 
   if (chapter.access_type === "free") {
     return { has_access: true, access_type: "free" };

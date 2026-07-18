@@ -1,4 +1,5 @@
 export type NovelStatus = "ongoing" | "completed" | "hiatus";
+export type NovelPublicationStatus = "draft" | "public";
 export type ChapterAccessType = "free" | "free_auth" | "paid";
 export type SubscriptionType = "chapter" | "novel";
 
@@ -9,6 +10,7 @@ export interface NovelDocument {
   description: string;
   cover_url: string;
   status: NovelStatus;
+  publication_status: NovelPublicationStatus;
   chapter_count: number;
   total_word_count: number;
   rating: number;
@@ -31,6 +33,7 @@ export interface NovelCreateInput {
   description?: string;
   cover_url?: string;
   status?: NovelStatus;
+  publication_status?: NovelPublicationStatus;
   rating?: number;
   views?: number;
   followers?: number;
@@ -45,6 +48,7 @@ export interface NovelUpdateInput {
   description?: string;
   cover_url?: string;
   status?: NovelStatus;
+  publication_status?: NovelPublicationStatus;
   rating?: number;
   views?: number;
   followers?: number;

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import { addFavorite, checkFavorite, listFavorites, removeFavorite } from "../services/favorite.js";
 import { parsePagination } from "../utils/pagination.js";
+import { getPublicNovel } from "../services/novel.js";
 
 type Variables = {
   user: unknown;
@@ -23,6 +24,7 @@ favorites.get("/", authMiddleware, async (c) => {
 favorites.post("/:novelId", authMiddleware, async (c) => {
   const userId = c.get("userId");
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
 
   const favorite = await addFavorite(userId, novelId);
   return c.json({ data: favorite }, 201);
@@ -32,6 +34,7 @@ favorites.post("/:novelId", authMiddleware, async (c) => {
 favorites.delete("/:novelId", authMiddleware, async (c) => {
   const userId = c.get("userId");
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
 
   await removeFavorite(userId, novelId);
   return c.json({ data: { success: true } }, 200);
@@ -41,6 +44,7 @@ favorites.delete("/:novelId", authMiddleware, async (c) => {
 favorites.get("/check/:novelId", authMiddleware, async (c) => {
   const userId = c.get("userId");
   const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
 
   const result = await checkFavorite(userId, novelId);
   return c.json({ data: result }, 200);

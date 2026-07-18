@@ -1,6 +1,7 @@
 import type admin from "firebase-admin";
 import type { NovelDocument, PaginatedResult } from "../types/novel.js";
 import { getFirestore } from "./firebase.js";
+import { isPublicNovel } from "./novel.js";
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
@@ -18,6 +19,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     slug: data.slug || id,
     price: data.price ?? null,
     is_featured: data.is_featured ?? false,
+    publication_status: data.publication_status === "draft" ? "draft" : "public",
     created_at: data.created_at,
     updated_at: data.updated_at,
   };
@@ -47,19 +49,12 @@ export async function searchNovels(params: {
     query = query.orderBy("updated_at", "desc");
   }
 
-  const totalCount = await query.count().get();
-  const total = totalCount.data().count;
-
-  if (!params.q || params.q.trim().length === 0) {
-    query = query.orderBy("updated_at", "desc");
-  }
-
-  if (page > 1) {
-    query = query.offset((page - 1) * limit);
-  }
-
-  const snapshot = await query.limit(limit).get();
-  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  const snapshot = await query.get();
+  const allNovels = snapshot.docs
+    .map((doc) => novelDocToData(doc.id, doc.data()))
+    .filter(isPublicNovel);
+  const total = allNovels.length;
+  const novels = allNovels.slice((page - 1) * limit, page * limit);
 
   return { items: novels, page, limit, total };
 }
