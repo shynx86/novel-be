@@ -36,36 +36,36 @@ novels.get("/sitemap", async (c) => {
 
 // GET /api/novels/trending
 novels.get("/trending", async (c) => {
-  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
-  const result = await getTrendingNovels(limit);
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const result = await getTrendingNovels(page, limit);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/completed
 novels.get("/completed", async (c) => {
-  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
-  const result = await getCompletedNovels(limit);
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const result = await getCompletedNovels(page, limit);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/featured
 novels.get("/featured", async (c) => {
-  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
-  const result = await getFeaturedNovels(limit);
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const result = await getFeaturedNovels(page, limit);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/completed-featured
 novels.get("/completed-featured", async (c) => {
-  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
-  const result = await getCompletedFeaturedNovels(limit);
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const result = await getCompletedFeaturedNovels(page, limit);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/newest
 novels.get("/newest", async (c) => {
-  const limit = Math.min(Number(c.req.query("limit")) || 10, 100);
-  const result = await getNewestNovels(limit);
+  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const result = await getNewestNovels(page, limit);
   return c.json({ data: result }, 200);
 });
 
