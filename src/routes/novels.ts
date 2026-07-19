@@ -1,7 +1,7 @@
 import type admin from "firebase-admin";
 import { Hono } from "hono";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
-import { getChapter, listChapters } from "../services/chapter.js";
+import { getChapter, listChapters, listNewestChapters } from "../services/chapter.js";
 import { getFirestore } from "../services/firebase.js";
 import {
   enrichNovelWithRelations,
@@ -13,8 +13,8 @@ import {
   getPublicNovelBySlug,
   getRelatedNovels,
   getTrendingNovels,
-  listPublicNovels,
   listNovelsForSitemap,
+  listPublicNovels,
 } from "../services/novel.js";
 import { checkSubscriptionAccess, getUserSubscriptionsForNovel } from "../services/subscription.js";
 import { ForbiddenError, UnauthorizedError } from "../utils/errors.js";
@@ -71,6 +71,15 @@ novels.get("/newest", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
   const search = c.req.query("search") || undefined;
   const result = await getNewestNovels(page, limit, search);
+  return c.json({ data: result }, 200);
+});
+
+// GET /api/novels/newest-chapters
+novels.get("/newest-chapters", async (c) => {
+  const requestedLimit = Number(c.req.query("limit"));
+  const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 50)) : 10;
+  const search = c.req.query("search") || undefined;
+  const result = await listNewestChapters(limit, search);
   return c.json({ data: result }, 200);
 });
 

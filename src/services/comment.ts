@@ -63,15 +63,14 @@ export async function createComment(
     parent_id: input.parent_id ?? null,
   };
 
-  const ref = await db.collection("novels").doc(novelId).collection("comments").add(docData);
-
-  // Increment comment count on novel
-  await db
-    .collection("novels")
-    .doc(novelId)
-    .update({
+  const ref = db.collection("novels").doc(novelId).collection("comments").doc();
+  const novelRef = db.collection("novels").doc(novelId);
+  await db.runTransaction(async (transaction) => {
+    transaction.set(ref, docData);
+    transaction.update(novelRef, {
       comment_count: admin.firestore.FieldValue.increment(1),
     });
+  });
 
   logger.info("Comment created", { novelId, commentId: ref.id, userId });
 
@@ -134,26 +133,19 @@ export async function deleteComment(
 ): Promise<void> {
   const db = getFirestore();
   const docRef = db.collection("novels").doc(novelId).collection("comments").doc(commentId);
-  const doc = await docRef.get();
+  const novelRef = db.collection("novels").doc(novelId);
+  await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef);
+    if (!doc.exists) throw new NotFoundError("Comment not found");
+    if (doc.data()?.user_id !== userId) {
+      throw new UnauthorizedError("You can only delete your own comments");
+    }
 
-  if (!doc.exists) {
-    throw new NotFoundError("Comment not found");
-  }
-
-  const data = doc.data();
-  if (data?.user_id !== userId) {
-    throw new UnauthorizedError("You can only delete your own comments");
-  }
-
-  await docRef.delete();
-
-  // Decrement comment count on novel
-  await db
-    .collection("novels")
-    .doc(novelId)
-    .update({
+    transaction.delete(docRef);
+    transaction.update(novelRef, {
       comment_count: admin.firestore.FieldValue.increment(-1),
     });
+  });
 
   logger.info("Comment deleted", { novelId, commentId, userId });
 }

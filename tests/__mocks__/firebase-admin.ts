@@ -38,6 +38,8 @@ export const mockTransactionGet: any = jest.fn();
 export const mockTransactionSet: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockTransactionUpdate: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockTransactionDelete: any = jest.fn();
 
 // Batch mocks
 // biome-ignore lint/suspicious/noExplicitAny: mock module
@@ -62,6 +64,7 @@ mockRunTransaction.mockImplementation(async (fn: any) => {
     get: mockTransactionGet,
     set: mockTransactionSet,
     update: mockTransactionUpdate,
+    delete: mockTransactionDelete,
   };
   return fn(transaction);
 });
@@ -107,6 +110,9 @@ function createCollectionRef() {
   };
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockCollectionGroup: any = jest.fn(() => createQueryBuilder());
+
 const mockApp = {
   auth: () => ({
     createUser: mockCreateUser,
@@ -115,6 +121,7 @@ const mockApp = {
   }),
   firestore: () => ({
     collection: jest.fn(() => createCollectionRef()),
+    collectionGroup: mockCollectionGroup,
     listCollections: jest.fn(),
     runTransaction: mockRunTransaction,
     getAll: mockGetAll,
@@ -129,6 +136,7 @@ const mockApp = {
 // firestore is both callable and has FieldValue property
 const firestoreFn = jest.fn(() => ({
   collection: jest.fn(() => createCollectionRef()),
+  collectionGroup: mockCollectionGroup,
   listCollections: jest.fn(),
   runTransaction: mockRunTransaction,
   getAll: mockGetAll,

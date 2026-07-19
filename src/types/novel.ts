@@ -82,6 +82,17 @@ export interface ChapterUpdateInput {
   price?: number;
 }
 
+export interface NewestChapterDocument {
+  novel_id: string;
+  novel_slug: string;
+  novel_title: string;
+  index: number;
+  title: string;
+  access_type: ChapterAccessType;
+  price: number;
+  updated_at: string;
+}
+
 export interface SubscriptionDocument {
   id: string;
   user_id: string;

@@ -22,16 +22,23 @@ export async function updateReadingProgress(
 ): Promise<ReadingHistoryDocument> {
   const db = getFirestore();
   const docRef = db.collection("users").doc(userId).collection("reading_history").doc(novelId);
-  const existing = await docRef.get();
-
   const now = new Date().toISOString();
-
-  if (existing.exists) {
-    const data = existing.data();
-    if (!data) {
-      throw new NotFoundError("Reading history not found");
+  const result = await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(docRef);
+    if (!existing.exists) {
+      const docData: ReadingHistoryDocument = {
+        novel_id: novelId,
+        last_chapter_index: chapterIndex,
+        last_read_at: now,
+        read_chapters: [chapterIndex],
+      };
+      transaction.set(docRef, docData);
+      return { document: docData, created: true };
     }
-    const readChapters = data.read_chapters || [];
+
+    const data = existing.data();
+    if (!data) throw new NotFoundError("Reading history not found");
+    const readChapters = [...(data.read_chapters || [])];
     if (!readChapters.includes(chapterIndex)) {
       readChapters.push(chapterIndex);
       readChapters.sort((a: number, b: number) => a - b);
@@ -42,24 +49,16 @@ export async function updateReadingProgress(
       last_read_at: now,
       read_chapters: readChapters,
     };
+    transaction.update(docRef, updates);
+    return { document: { novel_id: novelId, ...updates }, created: false };
+  });
 
-    await docRef.update(updates);
-    logger.info("Reading progress updated", { userId, novelId, chapterIndex });
-
-    return { novel_id: novelId, ...updates };
-  }
-
-  const docData: ReadingHistoryDocument = {
-    novel_id: novelId,
-    last_chapter_index: chapterIndex,
-    last_read_at: now,
-    read_chapters: [chapterIndex],
-  };
-
-  await docRef.set(docData);
-  logger.info("Reading history created", { userId, novelId, chapterIndex });
-
-  return docData;
+  logger.info(result.created ? "Reading history created" : "Reading progress updated", {
+    userId,
+    novelId,
+    chapterIndex,
+  });
+  return result.document;
 }
 
 export async function removeFromHistory(userId: string, novelId: string): Promise<void> {

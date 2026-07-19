@@ -3,6 +3,7 @@ import type {
   ChapterCreateInput,
   ChapterDocument,
   ChapterUpdateInput,
+  NewestChapterDocument,
   PaginatedResult,
 } from "../types/novel.js";
 import { NotFoundError } from "../utils/errors.js";
@@ -135,6 +136,63 @@ export async function listChapters(
   return { items: chapters, page, limit, total };
 }
 
+export async function listNewestChapters(
+  limit = 10,
+  search?: string,
+): Promise<NewestChapterDocument[]> {
+  const db = getFirestore();
+  const candidateLimit = Math.min(Math.max(limit * 10, 50), 100);
+  const snapshot = await db
+    .collectionGroup("chapters")
+    .select("index", "title", "access_type", "price", "updated_at")
+    .orderBy("updated_at", "desc")
+    .limit(candidateLimit)
+    .get();
+
+  const candidates = snapshot.docs
+    .map((doc) => ({ doc, novelId: doc.ref.parent.parent?.id }))
+    .filter(
+      (candidate): candidate is { doc: admin.firestore.QueryDocumentSnapshot; novelId: string } =>
+        Boolean(candidate.novelId),
+    );
+  const uniqueNovelIds = [...new Set(candidates.map((candidate) => candidate.novelId))];
+  const novelDocs = uniqueNovelIds.length
+    ? await db.getAll(...uniqueNovelIds.map((id) => db.collection("novels").doc(id)))
+    : [];
+  const novelsById = new Map(
+    novelDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()]),
+  );
+  const normalizedSearch = search?.trim().toLowerCase();
+
+  return candidates
+    .map(({ doc, novelId }) => {
+      const novel = novelsById.get(novelId);
+      if (!novel || novel.publication_status === "draft") return null;
+      if (
+        normalizedSearch &&
+        !String(novel.title || "")
+          .toLowerCase()
+          .includes(normalizedSearch)
+      ) {
+        return null;
+      }
+
+      const chapter = doc.data();
+      return {
+        novel_id: novelId,
+        novel_slug: novel.slug || novelId,
+        novel_title: novel.title,
+        index: chapter.index,
+        title: chapter.title,
+        access_type: chapter.access_type,
+        price: chapter.price || 0,
+        updated_at: chapter.updated_at,
+      };
+    })
+    .filter((chapter): chapter is NewestChapterDocument => chapter !== null)
+    .slice(0, limit);
+}
+
 export async function createChapter(
   novelId: string,
   input: ChapterCreateInput,
@@ -195,66 +253,61 @@ export async function updateChapter(
   input: ChapterUpdateInput,
 ): Promise<ChapterDocument> {
   const db = getFirestore();
-  const now = new Date().toISOString();
+  const chapterRef = db.collection("novels").doc(novelId).collection("chapters").doc(String(index));
+  const novelRef = db.collection("novels").doc(novelId);
+  const updatedChapter = await db.runTransaction(async (transaction) => {
+    const chapterDoc = await transaction.get(chapterRef);
+    const chapterData = chapterDoc.data();
+    if (!chapterDoc.exists || !chapterData) throw new NotFoundError("Chapter not found");
 
-  // Get existing chapter
-  const existing = await getChapter(novelId, index);
+    const existing = chapterDocToData(chapterData);
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { updated_at: now };
+    let wordCountDelta = 0;
 
-  const updates: Record<string, unknown> = { updated_at: now };
-  let wordCountDelta = 0;
+    if (input.title !== undefined) updates.title = input.title;
+    if (input.content !== undefined) {
+      updates.content = input.content;
+      const newWordCount = input.content.split(/\s+/).filter(Boolean).length;
+      updates.word_count = newWordCount;
+      wordCountDelta = newWordCount - existing.word_count;
+    }
+    if (input.access_type !== undefined) updates.access_type = input.access_type;
+    if (input.price !== undefined) updates.price = input.price;
 
-  if (input.title !== undefined) updates.title = input.title;
-  if (input.content !== undefined) {
-    updates.content = input.content;
-    const newWordCount = input.content.split(/\s+/).filter(Boolean).length;
-    updates.word_count = newWordCount;
-    wordCountDelta = newWordCount - existing.word_count;
-  }
-  if (input.access_type !== undefined) updates.access_type = input.access_type;
-  if (input.price !== undefined) {
-    updates.price = input.price;
-  }
-
-  await db
-    .collection("novels")
-    .doc(novelId)
-    .collection("chapters")
-    .doc(String(index))
-    .update(updates);
-
-  // Update novel's total_word_count if content changed
-  if (wordCountDelta !== 0) {
-    await db
-      .collection("novels")
-      .doc(novelId)
-      .update({
+    transaction.update(chapterRef, updates);
+    if (wordCountDelta !== 0) {
+      transaction.update(novelRef, {
         total_word_count: admin.firestore.FieldValue.increment(wordCountDelta),
         updated_at: now,
       });
-  }
+    }
+
+    return { ...existing, ...updates } as ChapterDocument;
+  });
 
   logger.info("Chapter updated", { novelId, index });
 
-  return { ...existing, ...updates } as ChapterDocument;
+  return updatedChapter;
 }
 
 export async function deleteChapter(novelId: string, index: number): Promise<void> {
   const db = getFirestore();
-  const now = new Date().toISOString();
+  const chapterRef = db.collection("novels").doc(novelId).collection("chapters").doc(String(index));
+  const novelRef = db.collection("novels").doc(novelId);
+  await db.runTransaction(async (transaction) => {
+    const chapterDoc = await transaction.get(chapterRef);
+    const chapterData = chapterDoc.data();
+    if (!chapterDoc.exists || !chapterData) throw new NotFoundError("Chapter not found");
 
-  const existing = await getChapter(novelId, index);
-
-  await db.collection("novels").doc(novelId).collection("chapters").doc(String(index)).delete();
-
-  // Update novel counters
-  await db
-    .collection("novels")
-    .doc(novelId)
-    .update({
+    const existing = chapterDocToData(chapterData);
+    transaction.delete(chapterRef);
+    transaction.update(novelRef, {
       chapter_count: admin.firestore.FieldValue.increment(-1),
       total_word_count: admin.firestore.FieldValue.increment(-existing.word_count),
-      updated_at: now,
+      updated_at: new Date().toISOString(),
     });
+  });
 
   logger.info("Chapter deleted", { novelId, index });
 }
