@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { requestLogger } from "./middleware/request-logger.js";
@@ -14,6 +15,17 @@ app.use(
     origin: ["http://localhost:3000", "http://localhost:3001", "https://novel-fe-six.vercel.app"],
     allowMethods: ["GET", "POST", "PATCH", "DELETE"],
     allowHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  }),
+);
+app.use(
+  bodyLimit({
+    maxSize: 1_000_000,
+    onError: (c) =>
+      c.json(
+        { error: { code: "PAYLOAD_TOO_LARGE", message: "Request body must be 1 MB or smaller" } },
+        413,
+      ),
   }),
 );
 app.use(requestLogger);
@@ -27,6 +39,7 @@ app.onError((err, c) => {
       FORBIDDEN: 403,
       CONFLICT: 409,
       INSUFFICIENT_CREDITS: 402,
+      TOO_MANY_REQUESTS: 429,
     };
 
     logger.warn("AppError", {

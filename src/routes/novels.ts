@@ -1,6 +1,8 @@
 import type admin from "firebase-admin";
 import { Hono } from "hono";
+import { authMiddleware } from "../middleware/auth.js";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { getChapter, listChapters, listNewestChapters } from "../services/chapter.js";
 import { getFirestore } from "../services/firebase.js";
 import {
@@ -198,18 +200,23 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
 });
 
 // POST /api/novels/:novelId/views — increment view count
-novels.post("/:novelId/views", async (c) => {
-  const novelId = c.req.param("novelId");
-  await getPublicNovel(novelId);
-  const db = getFirestore();
-  await db
-    .collection("novels")
-    .doc(novelId)
-    .update({
-      views: (await import("firebase-admin")).default.firestore.FieldValue.increment(1),
-    });
-  return c.json({ data: { success: true } }, 200);
-});
+novels.post(
+  "/:novelId/views",
+  authMiddleware,
+  rateLimit({ namespace: "novel-view", limit: 60, windowMs: 60_000, key: (c) => c.get("userId") }),
+  async (c) => {
+    const novelId = c.req.param("novelId");
+    await getPublicNovel(novelId);
+    const db = getFirestore();
+    await db
+      .collection("novels")
+      .doc(novelId)
+      .update({
+        views: (await import("firebase-admin")).default.firestore.FieldValue.increment(1),
+      });
+    return c.json({ data: { success: true } }, 200);
+  },
+);
 
 // Mount comments sub-routes under novels
 novels.route("/", comments);
