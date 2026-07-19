@@ -75,6 +75,8 @@ function createQueryBuilder() {
   const builder: Record<string, any> = {};
   builder.where = jest.fn(() => builder);
   builder.orderBy = jest.fn(() => builder);
+  builder.startAt = jest.fn(() => builder);
+  builder.endAt = jest.fn(() => builder);
   builder.limit = jest.fn(() => builder);
   builder.offset = jest.fn(() => builder);
   builder.select = jest.fn(() => builder);
@@ -84,8 +86,9 @@ function createQueryBuilder() {
 }
 
 // Create a doc reference mock
-function createDocRef() {
+function createDocRef(id?: string) {
   return {
+    id,
     get: mockDocGet,
     set: mockDocSet,
     update: mockDocUpdate,
@@ -98,10 +101,12 @@ function createDocRef() {
 function createCollectionRef() {
   const builder = createQueryBuilder();
   return {
-    doc: jest.fn(() => createDocRef()),
+    doc: jest.fn((id?: string) => createDocRef(id)),
     add: mockCollectionAdd,
     where: builder.where,
     orderBy: builder.orderBy,
+    startAt: builder.startAt,
+    endAt: builder.endAt,
     limit: builder.limit,
     offset: builder.offset,
     select: builder.select,

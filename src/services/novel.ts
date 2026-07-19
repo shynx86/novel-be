@@ -34,6 +34,45 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
   };
 }
 
+function normalizeNovelTitle(title: string): string {
+  return title.trim().toLocaleLowerCase();
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function getDocumentsByIds(
+  db: admin.firestore.Firestore,
+  collection: string,
+  ids: string[],
+): Promise<admin.firestore.DocumentSnapshot[]> {
+  const uniqueIds = [...new Set(ids)];
+  const snapshots = await Promise.all(
+    chunk(uniqueIds, 100).map((idsChunk) =>
+      db.getAll(...idsChunk.map((id) => db.collection(collection).doc(id))),
+    ),
+  );
+  return snapshots.flat();
+}
+
+async function getRelationsForNovels(
+  db: admin.firestore.Firestore,
+  collection: "novel_authors" | "novel_genres",
+  novelIds: string[],
+): Promise<admin.firestore.QueryDocumentSnapshot[]> {
+  const snapshots = await Promise.all(
+    chunk(novelIds, 30).map((idsChunk) =>
+      db.collection(collection).where("novel_id", "in", idsChunk).get(),
+    ),
+  );
+  return snapshots.flatMap((snapshot) => snapshot.docs);
+}
+
 export async function enrichNovelWithRelations(novel: NovelDocument): Promise<NovelDocument> {
   const db = getFirestore();
   const [authors, genres] = await Promise.all([
@@ -65,6 +104,73 @@ export async function enrichNovelWithRelations(novel: NovelDocument): Promise<No
   };
 }
 
+export async function enrichNovelsWithRelations(novels: NovelDocument[]): Promise<NovelDocument[]> {
+  if (novels.length === 0) return [];
+
+  const db = getFirestore();
+  const novelIds = novels.map((novel) => novel.id);
+  const [authorRelations, genreRelations] = await Promise.all([
+    getRelationsForNovels(db, "novel_authors", novelIds),
+    getRelationsForNovels(db, "novel_genres", novelIds),
+  ]);
+
+  const authorIdsByNovel = new Map<string, string[]>();
+  const genreIdsByNovel = new Map<string, string[]>();
+  for (const relation of authorRelations) {
+    const data = relation.data();
+    const ids = authorIdsByNovel.get(data.novel_id) ?? [];
+    ids.push(data.author_id);
+    authorIdsByNovel.set(data.novel_id, ids);
+  }
+  for (const relation of genreRelations) {
+    const data = relation.data();
+    const ids = genreIdsByNovel.get(data.novel_id) ?? [];
+    ids.push(data.genre_id);
+    genreIdsByNovel.set(data.novel_id, ids);
+  }
+
+  const [authorDocs, genreDocs, translatorDocs] = await Promise.all([
+    getDocumentsByIds(db, "authors", [...authorIdsByNovel.values()].flat()),
+    getDocumentsByIds(db, "genres", [...genreIdsByNovel.values()].flat()),
+    getDocumentsByIds(
+      db,
+      "users",
+      novels.flatMap((novel) => (novel.translator_id ? [novel.translator_id] : [])),
+    ),
+  ]);
+  const authorNames = new Map(
+    authorDocs
+      .filter((doc) => doc.exists)
+      .map((doc) => [doc.id, doc.data()?.name as string | undefined]),
+  );
+  const genreNames = new Map(
+    genreDocs
+      .filter((doc) => doc.exists)
+      .map((doc) => [doc.id, doc.data()?.name as string | undefined]),
+  );
+  const translators = new Map(
+    translatorDocs
+      .filter((doc) => doc.exists)
+      .map((doc) => {
+        const data = doc.data();
+        return [doc.id, { id: doc.id, name: data?.display_name || data?.email || "" }];
+      }),
+  );
+
+  return novels.map((novel) => ({
+    ...novel,
+    authors: (authorIdsByNovel.get(novel.id) ?? [])
+      .map((id) => ({ id, name: authorNames.get(id) }))
+      .filter((author): author is { id: string; name: string } => Boolean(author.name)),
+    genres: (genreIdsByNovel.get(novel.id) ?? [])
+      .map((id) => ({ id, name: genreNames.get(id) }))
+      .filter((genre): genre is { id: string; name: string } => Boolean(genre.name)),
+    ...(novel.translator_id && translators.has(novel.translator_id)
+      ? { translator: translators.get(novel.translator_id) }
+      : {}),
+  }));
+}
+
 export async function createNovel(input: NovelCreateInput): Promise<NovelDocument> {
   const db = getFirestore();
   const now = new Date().toISOString();
@@ -84,6 +190,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     comment_count: 0,
     price: input.price !== undefined ? input.price : null,
     is_featured: false,
+    title_lowercase: normalizeNovelTitle(input.title),
     created_at: now,
     updated_at: now,
   };
@@ -456,7 +563,8 @@ export async function listNovels(params: {
       .map((doc) => novelDocToData(doc.id, doc.data()))
       .filter((novel) => {
         if (params.status && novel.status !== params.status) return false;
-        if (params.publication_status && novel.publication_status !== params.publication_status) return false;
+        if (params.publication_status && novel.publication_status !== params.publication_status)
+          return false;
         if (params.translator_id && novel.translator_id !== params.translator_id) return false;
         return true;
       });
@@ -559,18 +667,6 @@ export async function listPublicNovels(params: {
   const db = getFirestore();
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 100);
-  let novels = (await db.collection("novels").get()).docs
-    .map((doc) => novelDocToData(doc.id, doc.data()))
-    .filter(isPublicNovel);
-
-  if (params.status) novels = novels.filter((novel) => novel.status === params.status);
-  if (params.translator_id) {
-    novels = novels.filter((novel) => novel.translator_id === params.translator_id);
-  }
-  if (params.search) {
-    const search = params.search.toLowerCase();
-    novels = novels.filter((novel) => novel.title.toLowerCase().includes(search));
-  }
 
   if (params.author_id || params.genre_id) {
     const [authorSnapshot, genreSnapshot] = await Promise.all([
@@ -581,21 +677,64 @@ export async function listPublicNovels(params: {
         ? db.collection("novel_genres").where("genre_id", "==", params.genre_id).get()
         : undefined,
     ]);
-    const authorIds = authorSnapshot
+    const authorNovelIds = authorSnapshot
       ? new Set(authorSnapshot.docs.map((doc) => doc.data().novel_id as string))
       : undefined;
-    const genreIds = genreSnapshot
+    const genreNovelIds = genreSnapshot
       ? new Set(genreSnapshot.docs.map((doc) => doc.data().novel_id as string))
       : undefined;
-    novels = novels.filter(
-      (novel) => (!authorIds || authorIds.has(novel.id)) && (!genreIds || genreIds.has(novel.id)),
+    const matchingNovelIds = [...(authorNovelIds ?? genreNovelIds ?? new Set<string>())].filter(
+      (id) => !genreNovelIds || genreNovelIds.has(id),
     );
+    if (matchingNovelIds.length === 0) return { items: [], page, limit, total: 0 };
+
+    const normalizedSearch = params.search?.trim() ? normalizeNovelTitle(params.search) : undefined;
+    const novels = (await getDocumentsByIds(db, "novels", matchingNovelIds))
+      .filter((doc) => doc.exists)
+      .map((doc) => novelDocToData(doc.id, doc.data()!))
+      .filter(
+        (novel) =>
+          isPublicNovel(novel) &&
+          (!params.status || novel.status === params.status) &&
+          (!params.translator_id || novel.translator_id === params.translator_id) &&
+          (!normalizedSearch || normalizeNovelTitle(novel.title).startsWith(normalizedSearch)),
+      )
+      .sort((a, b) =>
+        normalizedSearch
+          ? normalizeNovelTitle(a.title).localeCompare(normalizeNovelTitle(b.title))
+          : b.created_at.localeCompare(a.created_at),
+      );
+    const total = novels.length;
+    const items = novels.slice((page - 1) * limit, page * limit);
+    return { items: await enrichNovelsWithRelations(items), page, limit, total };
   }
 
-  novels.sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const total = novels.length;
-  const items = novels.slice((page - 1) * limit, page * limit);
-  const enriched = await Promise.all(items.map(enrichNovelWithRelations));
+  let query: admin.firestore.Query = db
+    .collection("novels")
+    .where("publication_status", "==", "public");
+
+  if (params.status) query = query.where("status", "==", params.status);
+  if (params.translator_id) query = query.where("translator_id", "==", params.translator_id);
+
+  const search = params.search?.trim();
+  if (search) {
+    const normalizedSearch = normalizeNovelTitle(search);
+    query = query
+      .orderBy("title_lowercase", "asc")
+      .startAt(normalizedSearch)
+      .endAt(`${normalizedSearch}\uf8ff`);
+  } else {
+    query = query.orderBy("created_at", "desc");
+  }
+
+  const totalCount = await query.count().get();
+  const total = totalCount.data().count;
+  if (page > 1) query = query.offset((page - 1) * limit);
+
+  const snapshot = await query.limit(limit).get();
+  const enriched = await enrichNovelsWithRelations(
+    snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data())),
+  );
   return { items: enriched, page, limit, total };
 }
 
@@ -611,6 +750,7 @@ export async function updateNovel(
   const updates: Record<string, unknown> = { updated_at: now };
   if (input.slug !== undefined) updates.slug = input.slug;
   if (input.title !== undefined) updates.title = input.title;
+  if (input.title !== undefined) updates.title_lowercase = normalizeNovelTitle(input.title);
   if (input.description !== undefined) updates.description = input.description;
   if (input.cover_url !== undefined) updates.cover_url = input.cover_url;
   if (input.status !== undefined) updates.status = input.status;
