@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
+import { rateLimit } from "../middleware/rate-limit.js";
 import { createComment, deleteComment, likeComment, listComments } from "../services/comment.js";
-import { parsePagination } from "../utils/pagination.js";
 import { getPublicNovel } from "../services/novel.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;
@@ -22,23 +23,33 @@ comments.get("/:novelId/comments", async (c) => {
 });
 
 // POST /api/novels/:novelId/comments
-comments.post("/:novelId/comments", authMiddleware, async (c) => {
-  const novelId = c.req.param("novelId");
-  await getPublicNovel(novelId);
-  const userId = c.get("userId");
-  const body = await c.req.json();
+comments.post(
+  "/:novelId/comments",
+  authMiddleware,
+  rateLimit({
+    namespace: "comment-create",
+    limit: 10,
+    windowMs: 60_000,
+    key: (c) => c.get("userId"),
+  }),
+  async (c) => {
+    const novelId = c.req.param("novelId");
+    await getPublicNovel(novelId);
+    const userId = c.get("userId");
+    const body = await c.req.json();
 
-  const user = c.get("user") as { name?: string; picture?: string } | undefined;
-  const userName = user?.name || "Anonymous";
-  const userAvatar = user?.picture ?? null;
+    const user = c.get("user") as { name?: string; picture?: string } | undefined;
+    const userName = user?.name || "Anonymous";
+    const userAvatar = user?.picture ?? null;
 
-  const comment = await createComment(novelId, userId, userName, userAvatar, {
-    content: body.content,
-    parent_id: body.parent_id,
-  });
+    const comment = await createComment(novelId, userId, userName, userAvatar, {
+      content: body.content,
+      parent_id: body.parent_id,
+    });
 
-  return c.json({ data: comment }, 201);
-});
+    return c.json({ data: comment }, 201);
+  },
+);
 
 // DELETE /api/novels/:novelId/comments/:commentId
 comments.delete("/:novelId/comments/:commentId", authMiddleware, async (c) => {
@@ -52,13 +63,23 @@ comments.delete("/:novelId/comments/:commentId", authMiddleware, async (c) => {
 });
 
 // POST /api/novels/:novelId/comments/:commentId/like
-comments.post("/:novelId/comments/:commentId/like", async (c) => {
-  const novelId = c.req.param("novelId");
-  await getPublicNovel(novelId);
-  const commentId = c.req.param("commentId");
+comments.post(
+  "/:novelId/comments/:commentId/like",
+  authMiddleware,
+  rateLimit({
+    namespace: "comment-like",
+    limit: 30,
+    windowMs: 60_000,
+    key: (c) => c.get("userId"),
+  }),
+  async (c) => {
+    const novelId = c.req.param("novelId");
+    await getPublicNovel(novelId);
+    const commentId = c.req.param("commentId");
 
-  const comment = await likeComment(novelId, commentId);
-  return c.json({ data: comment }, 200);
-});
+    const comment = await likeComment(novelId, commentId, c.get("userId"));
+    return c.json({ data: comment }, 200);
+  },
+);
 
 export { comments };
