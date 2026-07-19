@@ -116,7 +116,24 @@ export async function subscribeChapter(
 
   const result = await db.runTransaction(async (transaction) => {
     const userRef = db.collection("users").doc(userId);
+    const novelSubRef = db
+      .collection("subscriptions")
+      .doc(buildSubscriptionId(userId, novelId, -1));
+    const chapterSubRef = db
+      .collection("subscriptions")
+      .doc(buildSubscriptionId(userId, novelId, chapterIndex));
     const userDoc = await transaction.get(userRef);
+    const [novelSub, chapterSub] = await Promise.all([
+      transaction.get(novelSubRef),
+      transaction.get(chapterSubRef),
+    ]);
+
+    if (novelSub.exists) {
+      throw new ConflictError("You have already subscribed to this novel");
+    }
+    if (chapterSub.exists) {
+      throw new ConflictError("You have already subscribed to this chapter");
+    }
 
     if (!userDoc.exists) {
       throw new NotFoundError("User not found");
@@ -137,8 +154,6 @@ export async function subscribeChapter(
     });
 
     // Create subscription
-    const subId = buildSubscriptionId(userId, novelId, chapterIndex);
-    const subRef = db.collection("subscriptions").doc(subId);
     const subData = {
       user_id: userId,
       novel_id: novelId,
@@ -147,7 +162,7 @@ export async function subscribeChapter(
       credits_paid: price,
       subscribed_at: now,
     };
-    transaction.set(subRef, subData);
+    transaction.set(chapterSubRef, subData);
 
     return { credits_remaining: credits - price, subData };
   });
@@ -190,7 +205,15 @@ export async function subscribeNovel(
 
   const result = await db.runTransaction(async (transaction) => {
     const userRef = db.collection("users").doc(userId);
+    const novelSubRef = db
+      .collection("subscriptions")
+      .doc(buildSubscriptionId(userId, novelId, -1));
     const userDoc = await transaction.get(userRef);
+    const novelSub = await transaction.get(novelSubRef);
+
+    if (novelSub.exists) {
+      throw new ConflictError("You have already subscribed to this novel");
+    }
 
     if (!userDoc.exists) {
       throw new NotFoundError("User not found");
@@ -211,8 +234,6 @@ export async function subscribeNovel(
     });
 
     // Create subscription
-    const subId = buildSubscriptionId(userId, novelId, -1);
-    const subRef = db.collection("subscriptions").doc(subId);
     const subData = {
       user_id: userId,
       novel_id: novelId,
@@ -221,7 +242,7 @@ export async function subscribeNovel(
       credits_paid: price,
       subscribed_at: now,
     };
-    transaction.set(subRef, subData);
+    transaction.set(novelSubRef, subData);
 
     return { credits_remaining: credits - price, subData };
   });

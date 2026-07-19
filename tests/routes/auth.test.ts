@@ -78,7 +78,7 @@ afterEach(() => {
 // ─── POST /api/auth/register ─────────────────────────────────────────
 
 describe("POST /api/auth/register", () => {
-  it("returns 201 with user, idToken and refreshToken on success", async () => {
+  it("returns 201 with an id token and an HttpOnly refresh cookie on success", async () => {
     setupMocksForSuccessfulRegistration();
     globalThis.fetch = mockExchangeFetch();
 
@@ -96,7 +96,9 @@ describe("POST /api/auth/register", () => {
     const body = await res.json();
     expect(body.data).toHaveProperty("user");
     expect(body.data).toHaveProperty("idToken", mockIdToken);
-    expect(body.data).toHaveProperty("refreshToken", mockRefreshToken);
+    expect(body.data).not.toHaveProperty("refreshToken");
+    expect(res.headers.get("set-cookie")).toContain(`novel_refresh=${mockRefreshToken}`);
+    expect(res.headers.get("set-cookie")).toContain("HttpOnly");
     expect(body.data.user.email).toBe("test@test.com");
     expect(body.data.user.display_name).toBe("Test User");
   });
@@ -169,7 +171,7 @@ describe("POST /api/auth/login", () => {
     mockCreateCustomToken.mockResolvedValue(mockCustomToken);
   });
 
-  it("returns 200 with user, idToken and refreshToken on valid credentials", async () => {
+  it("returns 200 with user, idToken and an HttpOnly refresh cookie on valid credentials", async () => {
     setupMocksForExistingUser();
     globalThis.fetch = mockLoginFetch();
 
@@ -183,7 +185,8 @@ describe("POST /api/auth/login", () => {
     const body = await res.json();
     expect(body.data.user.email).toBe("test@test.com");
     expect(body.data.idToken).toBe(mockIdToken);
-    expect(body.data.refreshToken).toBe(mockRefreshToken);
+    expect(body.data.refreshToken).toBeUndefined();
+    expect(res.headers.get("set-cookie")).toContain(`novel_refresh=${mockRefreshToken}`);
   });
 
   it("returns 401 when credentials are invalid", async () => {
@@ -260,7 +263,7 @@ describe("POST /api/auth/google", () => {
     globalThis.fetch = mockExchangeFetch();
   });
 
-  it("returns 200 with user, idToken and refreshToken for existing user", async () => {
+  it("returns 200 with user, idToken and an HttpOnly refresh cookie for an existing user", async () => {
     mockDocGet.mockResolvedValue({
       exists: true,
       data: () => ({
@@ -282,7 +285,8 @@ describe("POST /api/auth/google", () => {
     const body = await res.json();
     expect(body.data.user.display_name).toBe("Jane Smith");
     expect(body.data.idToken).toBe(mockIdToken);
-    expect(body.data.refreshToken).toBe(mockRefreshToken);
+    expect(body.data.refreshToken).toBeUndefined();
+    expect(res.headers.get("set-cookie")).toContain(`novel_refresh=${mockRefreshToken}`);
   });
 
   it("returns 201 for new user (auto-register)", async () => {
@@ -364,7 +368,7 @@ describe("POST /api/auth/google", () => {
 // ─── POST /api/auth/refresh ──────────────────────────────────────────
 
 describe("POST /api/auth/refresh", () => {
-  it("returns 200 with new idToken and refreshToken", async () => {
+  it("returns 200 with a new idToken and rotates the refresh cookie", async () => {
     globalThis.fetch = (() =>
       Promise.resolve({
         ok: true,
@@ -376,17 +380,17 @@ describe("POST /api/auth/refresh", () => {
 
     const res = await app.request("/api/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: "valid-refresh-token" }),
+      headers: { Cookie: "novel_refresh=valid-refresh-token" },
     });
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.idToken).toBe("new-id-token");
-    expect(body.data.refreshToken).toBe("new-refresh-token");
+    expect(body.data.refreshToken).toBeUndefined();
+    expect(res.headers.get("set-cookie")).toContain("novel_refresh=new-refresh-token");
   });
 
-  it("returns 401 when refresh_token is invalid", async () => {
+  it("returns 401 when the refresh cookie is invalid", async () => {
     globalThis.fetch = (() =>
       Promise.resolve({
         ok: false,
@@ -395,8 +399,7 @@ describe("POST /api/auth/refresh", () => {
 
     const res = await app.request("/api/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: "invalid-token" }),
+      headers: { Cookie: "novel_refresh=invalid-token" },
     });
 
     expect(res.status).toBe(401);
@@ -404,11 +407,9 @@ describe("POST /api/auth/refresh", () => {
     expect(body.error.code).toBe("UNAUTHORIZED");
   });
 
-  it("returns 400 when refresh_token is missing", async () => {
+  it("returns 400 when the refresh cookie is missing", async () => {
     const res = await app.request("/api/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
     });
 
     expect(res.status).toBe(400);
@@ -416,7 +417,7 @@ describe("POST /api/auth/refresh", () => {
     expect(body.error.code).toBe("VALIDATION_ERROR");
   });
 
-  it("returns 401 when refresh_token is expired", async () => {
+  it("returns 401 when the refresh cookie is expired", async () => {
     globalThis.fetch = (() =>
       Promise.resolve({
         ok: false,
@@ -425,8 +426,7 @@ describe("POST /api/auth/refresh", () => {
 
     const res = await app.request("/api/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: "expired-token" }),
+      headers: { Cookie: "novel_refresh=expired-token" },
     });
 
     expect(res.status).toBe(401);

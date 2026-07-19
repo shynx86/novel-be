@@ -1,7 +1,12 @@
 import admin from "firebase-admin";
 import type { CommentCreateInput, CommentDocument, CommentWithReplies } from "../types/comment.js";
 import type { PaginatedResult } from "../types/novel.js";
-import { NotFoundError, UnauthorizedError, ValidationError } from "../utils/errors.js";
+import {
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 
@@ -158,17 +163,25 @@ export async function deleteComment(
   logger.info("Comment deleted", { novelId, commentId, userId });
 }
 
-export async function likeComment(novelId: string, commentId: string): Promise<CommentDocument> {
+export async function likeComment(
+  novelId: string,
+  commentId: string,
+  userId: string,
+): Promise<CommentDocument> {
   const db = getFirestore();
   const docRef = db.collection("novels").doc(novelId).collection("comments").doc(commentId);
-  const doc = await docRef.get();
+  const likeRef = docRef.collection("likes").doc(userId);
 
-  if (!doc.exists) {
-    throw new NotFoundError("Comment not found");
-  }
+  await db.runTransaction(async (transaction) => {
+    const [doc, existingLike] = await Promise.all([
+      transaction.get(docRef),
+      transaction.get(likeRef),
+    ]);
+    if (!doc.exists) throw new NotFoundError("Comment not found");
+    if (existingLike.exists) throw new ConflictError("You have already liked this comment");
 
-  await docRef.update({
-    likes: admin.firestore.FieldValue.increment(1),
+    transaction.set(likeRef, { user_id: userId, created_at: new Date().toISOString() });
+    transaction.update(docRef, { likes: admin.firestore.FieldValue.increment(1) });
   });
 
   const updated = await docRef.get();
