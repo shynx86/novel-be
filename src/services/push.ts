@@ -146,6 +146,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
   const novelData: Record<string, unknown> = {
     slug,
     title: input.title,
+    title_lowercase: input.title.trim().toLocaleLowerCase(),
     description: input.description ?? "",
     cover_url: input.cover_url ?? "",
     status: mapStatus(input.status),

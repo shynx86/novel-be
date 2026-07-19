@@ -17,6 +17,7 @@
     "seed:genres": "tsx scripts/seed-genres.ts",
     "seed:all": "tsx scripts/seed-all.ts",
     "migrate:chapter-access-type": "tsx scripts/migrate-chapter-access-type.ts",
+    "migrate:novel-list-fields": "tsx scripts/backfill-novel-list-fields.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

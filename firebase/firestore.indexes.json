@@ -77,6 +77,78 @@
       "collectionGroup": "chapters",
       "queryScope": "COLLECTION_GROUP",
       "fields": [{ "fieldPath": "updated_at", "order": "DESCENDING" }]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "translator_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "translator_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "title_lowercase", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "title_lowercase", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "translator_id", "order": "ASCENDING" },
+        { "fieldPath": "title_lowercase", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "translator_id", "order": "ASCENDING" },
+        { "fieldPath": "title_lowercase", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
