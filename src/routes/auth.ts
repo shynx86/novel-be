@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
 import { authMiddleware } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import {
@@ -18,27 +17,6 @@ type Variables = {
 };
 
 const auth = new Hono<{ Variables: Variables }>();
-const REFRESH_COOKIE = "novel_refresh";
-const REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
-
-function setRefreshCookie(c: Parameters<typeof setCookie>[0], refreshToken: string): void {
-  setCookie(c, REFRESH_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    path: "/api/auth",
-    maxAge: REFRESH_COOKIE_MAX_AGE,
-  });
-}
-
-function withoutRefreshToken<T extends { user: unknown; idToken: string; refreshToken: string }>(
-  c: Parameters<typeof setCookie>[0],
-  result: T,
-) {
-  setRefreshCookie(c, result.refreshToken);
-  const { refreshToken: _refreshToken, ...response } = result;
-  return response;
-}
 
 auth.use("/register", rateLimit({ namespace: "auth-register", limit: 5, windowMs: 60_000 }));
 auth.use("/login", rateLimit({ namespace: "auth-login", limit: 10, windowMs: 60_000 }));
@@ -67,7 +45,7 @@ auth.post("/register", async (c) => {
 
   const result = await registerWithEmail(body.email, body.password, body.display_name);
 
-  return c.json({ data: withoutRefreshToken(c, result) }, 201);
+  return c.json({ data: result }, 201);
 });
 
 // POST /api/auth/login
@@ -84,7 +62,7 @@ auth.post("/login", async (c) => {
 
   const result = await loginWithEmail(body.email, body.password);
 
-  return c.json({ data: withoutRefreshToken(c, result) }, 200);
+  return c.json({ data: result }, 200);
 });
 
 // POST /api/auth/google
@@ -100,20 +78,21 @@ auth.post("/google", async (c) => {
   const status = result.isNewUser ? 201 : 200;
   const { isNewUser, ...data } = result;
 
-  return c.json({ data: withoutRefreshToken(c, data) }, status);
+  return c.json({ data }, status);
 });
 
 // POST /api/auth/refresh
 auth.post("/refresh", async (c) => {
-  const refreshToken = getCookie(c, REFRESH_COOKIE);
-  if (!refreshToken) {
-    throw new ValidationError("Refresh cookie is required", { field: "refresh_cookie" });
+  const body = await c.req
+    .json<{ refresh_token?: string }>()
+    .catch((): { refresh_token?: string } => ({}));
+  if (!body.refresh_token || typeof body.refresh_token !== "string") {
+    throw new ValidationError("refresh_token is required", { field: "refresh_token" });
   }
 
-  const data = await refreshIdToken(refreshToken);
-  setRefreshCookie(c, data.refreshToken);
+  const data = await refreshIdToken(body.refresh_token);
 
-  return c.json({ data: { idToken: data.idToken } }, 200);
+  return c.json({ data }, 200);
 });
 
 // GET /api/auth/me (protected)
