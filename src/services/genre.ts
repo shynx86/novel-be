@@ -1,4 +1,5 @@
 import type admin from "firebase-admin";
+import { toVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
 
 export interface GenreDocument {
@@ -17,10 +18,12 @@ function genreDocToData(id: string, data: admin.firestore.DocumentData): GenreDo
 
 export async function getGenreBySlug(slug: string): Promise<GenreDocument | null> {
   const db = getFirestore();
-  const snapshot = await db.collection("genres").where("slug", "==", slug).limit(1).get();
-  if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return genreDocToData(doc.id, doc.data());
+  const normalizedSlug = toVietnameseSlug(slug);
+  if (!normalizedSlug) return null;
+  const doc = await db.collection("genres").doc(normalizedSlug).get();
+  const data = doc.data();
+  if (!doc.exists || !data) return null;
+  return genreDocToData(doc.id, data);
 }
 
 export async function listGenres(): Promise<GenreDocument[]> {

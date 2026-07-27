@@ -5,8 +5,9 @@ import type {
   AuthorUpdateInput,
   PaginatedResult,
 } from "../types/novel.js";
-import { NotFoundError } from "../utils/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+import { assertImmutableSlug, requireVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
 
 function authorDocToData(
@@ -76,12 +77,7 @@ export async function getAuthor(authorId: string): Promise<AuthorDocument> {
 export async function createAuthor(input: AuthorCreateInput): Promise<AuthorDocument> {
   const db = getFirestore();
   const now = new Date().toISOString();
-  const slug =
-    input.slug ||
-    input.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+  const slug = requireVietnameseSlug(input.slug || input.name);
 
   const docData = {
     name: input.name,
@@ -92,10 +88,17 @@ export async function createAuthor(input: AuthorCreateInput): Promise<AuthorDocu
     updated_at: now,
   };
 
-  const ref = await db.collection("authors").add(docData);
-  logger.info("Author created", { authorId: ref.id, name: input.name });
+  const ref = db.collection("authors").doc(slug);
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(ref);
+    if (existing.exists) {
+      throw new ConflictError("Author with this slug already exists", { slug });
+    }
+    transaction.set(ref, docData);
+  });
+  logger.info("Author created", { authorId: slug, name: input.name });
 
-  return authorDocToData(ref.id, docData);
+  return authorDocToData(slug, docData);
 }
 
 export async function updateAuthor(
@@ -105,11 +108,11 @@ export async function updateAuthor(
   const db = getFirestore();
   const doc = await db.collection("authors").doc(authorId).get();
   if (!doc.exists) throw new NotFoundError("Author not found");
+  if (input.slug !== undefined) assertImmutableSlug(authorId, input.slug);
 
   const now = new Date().toISOString();
   const updates: Record<string, unknown> = { updated_at: now };
   if (input.name !== undefined) updates.name = input.name;
-  if (input.slug !== undefined) updates.slug = input.slug;
   if (input.bio !== undefined) updates.bio = input.bio;
   if (input.avatar_url !== undefined) updates.avatar_url = input.avatar_url;
 

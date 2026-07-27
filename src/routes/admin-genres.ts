@@ -64,6 +64,9 @@ adminGenres.post("/", async (c) => {
   if (!body.name || typeof body.name !== "string") {
     throw new ValidationError("name is required", { field: "name" });
   }
+  if (body.slug !== undefined && typeof body.slug !== "string") {
+    throw new ValidationError("slug must be a string", { field: "slug" });
+  }
 
   const genre = await createGenre({ name: body.name, slug: body.slug });
   return c.json({ data: genre }, 201);
@@ -72,6 +75,9 @@ adminGenres.post("/", async (c) => {
 adminGenres.patch("/:genreId", async (c) => {
   const genreId = c.req.param("genreId");
   const body = await c.req.json();
+  if (body.slug !== undefined && typeof body.slug !== "string") {
+    throw new ValidationError("slug must be a string", { field: "slug" });
+  }
   const genre = await updateGenre(genreId, { name: body.name, slug: body.slug });
   return c.json({ data: genre }, 200);
 });

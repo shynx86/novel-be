@@ -3,11 +3,9 @@ import { app } from "../../src/app.js";
 import {
   mockBatchCommit,
   mockBatchDelete,
-  mockCollectionAdd,
   mockCountGet,
   mockDocDelete,
   mockDocGet,
-  mockDocSet,
   mockDocUpdate,
   mockQueryGet,
   mockRunTransaction,
@@ -63,7 +61,7 @@ beforeEach(() => {
 describe("POST /api/admin/novels", () => {
   it("returns 201 with created novel", async () => {
     setupAdminAuth();
-    mockCollectionAdd.mockResolvedValue({ id: "novel-new" });
+    mockTransactionGet.mockResolvedValueOnce({ exists: false });
 
     const res = await app.request("/api/admin/novels", {
       method: "POST",
@@ -72,7 +70,7 @@ describe("POST /api/admin/novels", () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        title: "New Novel",
+        title: "Đấu Phá Thương Khung",
         author: "Author Name",
         genre: ["Fantasy", "Adventure"],
       }),
@@ -80,7 +78,9 @@ describe("POST /api/admin/novels", () => {
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.data.title).toBe("New Novel");
+    expect(body.data.title).toBe("Đấu Phá Thương Khung");
+    expect(body.data.id).toBe("dau-pha-thuong-khung");
+    expect(body.data.slug).toBe("dau-pha-thuong-khung");
   });
 
   it("returns 400 when title is missing", async () => {
@@ -96,6 +96,22 @@ describe("POST /api/admin/novels", () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it("returns 409 when the normalized slug already exists", async () => {
+    setupAdminAuth();
+    mockTransactionGet.mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc });
+
+    const res = await app.request("/api/admin/novels", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title: "Đấu Phá", slug: "Đấu Phá" }),
+    });
+
+    expect(res.status).toBe(409);
   });
 
   it("returns 403 for non-admin user", async () => {
@@ -122,6 +138,7 @@ describe("GET /api/admin/novels/:novelId", () => {
     setupAdminAuth();
     // Second docGet is the route reading novel
     mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc });
+    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
 
     const res = await app.request("/api/admin/novels/novel-1", {
       headers: { Authorization: "Bearer admin-token" },
@@ -136,6 +153,21 @@ describe("GET /api/admin/novels/:novelId", () => {
 // ─── PATCH /api/admin/novels/:novelId ──────────────────────────────────
 
 describe("PATCH /api/admin/novels/:novelId", () => {
+  it("rejects changing an existing slug", async () => {
+    setupAdminAuth();
+
+    const res = await app.request("/api/admin/novels/novel-1", {
+      method: "PATCH",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ slug: "novel-2" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   it("returns 200 with updated novel", async () => {
     setupAdminAuth();
     // getNovel reads doc

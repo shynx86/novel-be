@@ -4,8 +4,8 @@ import {
   mockCollectionAdd,
   mockCountGet,
   mockDocGet,
-  mockDocSet,
   mockQueryGet,
+  mockTransactionGet,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
 
@@ -60,9 +60,7 @@ describe("GET /api/admin/genres", () => {
 describe("POST /api/admin/genres", () => {
   it("returns 201 with created genre", async () => {
     setupAdminAuth();
-    // Duplicate check → not exists
-    mockDocGet.mockResolvedValueOnce({ exists: false });
-    mockDocSet.mockResolvedValue(undefined);
+    mockTransactionGet.mockResolvedValueOnce({ exists: false });
 
     const res = await app.request("/api/admin/genres", {
       method: "POST",
@@ -97,8 +95,10 @@ describe("POST /api/admin/genres", () => {
 
   it("returns 409 when slug already exists", async () => {
     setupAdminAuth();
-    // Duplicate check → exists
-    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => ({ name: "Action" }) });
+    mockTransactionGet.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({ name: "Action" }),
+    });
 
     const res = await app.request("/api/admin/genres", {
       method: "POST",
@@ -114,6 +114,24 @@ describe("POST /api/admin/genres", () => {
 });
 
 // ─── DELETE /api/admin/genres/:genreId ───────────────────────────────────
+
+describe("PATCH /api/admin/genres/:genreId", () => {
+  it("rejects changing an existing slug", async () => {
+    setupAdminAuth();
+    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockGenreDoc });
+
+    const res = await app.request("/api/admin/genres/fantasy", {
+      method: "PATCH",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ slug: "new-fantasy" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+});
 
 describe("DELETE /api/admin/genres/:genreId", () => {
   it("returns 200 when no linked novels", async () => {
