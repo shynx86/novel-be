@@ -88,6 +88,7 @@ adminNovels.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
   const status = c.req.query("status");
   const publicationStatus = c.req.query("publication_status");
+  const search = c.req.query("search");
   const sortBy = c.req.query("sort_by") as
     | "created_at"
     | "updated_at"
@@ -107,6 +108,7 @@ adminNovels.get("/", async (c) => {
     limit,
     status,
     publication_status: publicationStatus,
+    search,
     translator_id: translatorId,
     sort_by: sortBy,
     sort_order: sortOrder,
