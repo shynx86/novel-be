@@ -554,7 +554,7 @@ export async function listNovels(params: {
     const lowerSearch = params.search.toLowerCase();
     let query: admin.firestore.Query = db
       .collection("novels")
-      .orderBy("title")
+      .orderBy("title_lowercase")
       .startAt(lowerSearch)
       .endAt(`${lowerSearch}\uf8ff`);
 
