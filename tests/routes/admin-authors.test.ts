@@ -1,10 +1,10 @@
 import { jest } from "@jest/globals";
 import { app } from "../../src/app.js";
 import {
-  mockCollectionAdd,
   mockCountGet,
   mockDocGet,
   mockQueryGet,
+  mockTransactionGet,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
 
@@ -80,7 +80,7 @@ describe("GET /api/admin/authors/:authorId", () => {
 describe("POST /api/admin/authors", () => {
   it("returns 201 with created author", async () => {
     setupAdminAuth();
-    mockCollectionAdd.mockResolvedValue({ id: "author-new" });
+    mockTransactionGet.mockResolvedValueOnce({ exists: false });
 
     const res = await app.request("/api/admin/authors", {
       method: "POST",
@@ -88,12 +88,14 @@ describe("POST /api/admin/authors", () => {
         Authorization: "Bearer admin-token",
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ name: "New Author" }),
+      body: JSON.stringify({ name: "Nguyễn Nhật Ánh" }),
     });
 
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.data.name).toBe("New Author");
+    expect(body.data.name).toBe("Nguyễn Nhật Ánh");
+    expect(body.data.id).toBe("nguyen-nhat-anh");
+    expect(body.data.slug).toBe("nguyen-nhat-anh");
   });
 
   it("returns 400 when name is missing", async () => {
@@ -110,11 +112,43 @@ describe("POST /api/admin/authors", () => {
 
     expect(res.status).toBe(400);
   });
+
+  it("returns 409 when the normalized slug already exists", async () => {
+    setupAdminAuth();
+    mockTransactionGet.mockResolvedValueOnce({ exists: true, data: () => mockAuthorDoc });
+
+    const res = await app.request("/api/admin/authors", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: "Nguyễn Nhật Ánh" }),
+    });
+
+    expect(res.status).toBe(409);
+  });
 });
 
 // ─── PATCH /api/admin/authors/:authorId ───────────────────────────────────
 
 describe("PATCH /api/admin/authors/:authorId", () => {
+  it("rejects changing an existing slug", async () => {
+    setupAdminAuth();
+    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockAuthorDoc });
+
+    const res = await app.request("/api/admin/authors/test-author", {
+      method: "PATCH",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ slug: "another-author" }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   it("returns 200 with updated author", async () => {
     setupAdminAuth();
     mockDocGet

@@ -2,6 +2,7 @@ import type admin from "firebase-admin";
 import type { NovelDocument } from "../types/novel.js";
 import { NotFoundError, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+import { requireVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
 import { setNovelAuthors, setNovelGenres } from "./novel-relation.js";
 
@@ -33,86 +34,6 @@ interface UpsertChaptersInput {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const VIETNAMESE_MAP: Record<string, string> = {
-  à: "a",
-  á: "a",
-  ả: "a",
-  ã: "a",
-  ạ: "a",
-  ă: "a",
-  ằ: "a",
-  ắ: "a",
-  ẳ: "a",
-  ẵ: "a",
-  ặ: "a",
-  â: "a",
-  ầ: "a",
-  ấ: "a",
-  ẩ: "a",
-  ẫ: "a",
-  ậ: "a",
-  đ: "d",
-  è: "e",
-  é: "e",
-  ẻ: "e",
-  ẽ: "e",
-  ẹ: "e",
-  ê: "e",
-  ề: "e",
-  ế: "e",
-  ể: "e",
-  ễ: "e",
-  ệ: "e",
-  ì: "i",
-  í: "i",
-  ỉ: "i",
-  ĩ: "i",
-  ị: "i",
-  ò: "o",
-  ó: "o",
-  ỏ: "o",
-  õ: "o",
-  ọ: "o",
-  ô: "o",
-  ồ: "o",
-  ố: "o",
-  ổ: "o",
-  ỗ: "o",
-  ộ: "o",
-  ơ: "o",
-  ờ: "o",
-  ớ: "o",
-  ở: "o",
-  ỡ: "o",
-  ợ: "o",
-  ù: "u",
-  ú: "u",
-  ủ: "u",
-  ũ: "u",
-  ụ: "u",
-  ư: "u",
-  ừ: "u",
-  ứ: "u",
-  ử: "u",
-  ữ: "u",
-  ự: "u",
-  ỳ: "y",
-  ý: "y",
-  ỷ: "y",
-  ỹ: "y",
-  ỵ: "y",
-};
-
-function toSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .split("")
-    .map((c) => VIETNAMESE_MAP[c] || c)
-    .join("")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
-
 const STATUS_MAP: Record<string, NovelDocument["status"]> = {
   full: "completed",
   completed: "completed",
@@ -134,7 +55,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
 }> {
   const db = getFirestore();
   const now = new Date().toISOString();
-  const slug = input.slug;
+  const slug = requireVietnameseSlug(input.slug);
 
   if (!slug) throw new ValidationError("slug is required", { field: "slug" });
   if (!input.title) throw new ValidationError("title is required", { field: "title" });
@@ -175,7 +96,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
   if (input.authors && input.authors.length > 0) {
     for (const author of input.authors) {
       if (!author.name) continue;
-      const authorSlug = author.slug || toSlug(author.name);
+      const authorSlug = requireVietnameseSlug(author.slug || author.name);
       const authorRef = db.collection("authors").doc(authorSlug);
       const existingAuthor = await authorRef.get();
 
@@ -205,7 +126,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
   if (input.genres && input.genres.length > 0) {
     for (const genre of input.genres) {
       if (!genre.name) continue;
-      const genreSlug = genre.slug || toSlug(genre.name);
+      const genreSlug = requireVietnameseSlug(genre.slug || genre.name);
       const genreRef = db.collection("genres").doc(genreSlug);
       const existingGenre = await genreRef.get();
 
@@ -272,18 +193,14 @@ export async function upsertNovelChapters(input: UpsertChaptersInput): Promise<{
     });
   }
 
-  // Verify novel exists
-  const novelSnapshot = await db
-    .collection("novels")
-    .where("slug", "==", input.novel_slug)
-    .limit(1)
-    .get();
+  const novelSlug = requireVietnameseSlug(input.novel_slug, "novel_slug");
+  const novelSnapshot = await db.collection("novels").doc(novelSlug).get();
 
-  if (novelSnapshot.empty) {
+  if (!novelSnapshot.exists) {
     throw new NotFoundError(`Novel with slug "${input.novel_slug}" not found`);
   }
 
-  const novelId = novelSnapshot.docs[0].id;
+  const novelId = novelSlug;
 
   // Batch upsert chapters
   const batch = db.batch();

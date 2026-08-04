@@ -2,6 +2,7 @@ import type admin from "firebase-admin";
 import type { GenreCreateInput, GenreDocument, GenreUpdateInput } from "../types/novel.js";
 import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+import { assertImmutableSlug, requireVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
 
 function genreDocToData(
@@ -46,25 +47,21 @@ export async function listGenresAdmin(page: number, limit: number) {
 
 export async function createGenre(input: GenreCreateInput): Promise<GenreDocument> {
   const db = getFirestore();
-  const slug =
-    input.slug ||
-    input.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
-
-  // Check for duplicate slug
-  const existing = await db.collection("genres").doc(slug).get();
-  if (existing.exists) {
-    throw new ConflictError("Genre with this slug already exists", { slug });
-  }
+  const slug = requireVietnameseSlug(input.slug || input.name);
 
   const docData = {
     name: input.name,
     slug,
   };
 
-  await db.collection("genres").doc(slug).set(docData);
+  const ref = db.collection("genres").doc(slug);
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(ref);
+    if (existing.exists) {
+      throw new ConflictError("Genre with this slug already exists", { slug });
+    }
+    transaction.set(ref, docData);
+  });
   logger.info("Genre created", { genreId: slug, name: input.name });
 
   return genreDocToData(slug, docData);
@@ -77,10 +74,10 @@ export async function updateGenre(
   const db = getFirestore();
   const doc = await db.collection("genres").doc(genreId).get();
   if (!doc.exists) throw new NotFoundError("Genre not found");
+  if (input.slug !== undefined) assertImmutableSlug(genreId, input.slug);
 
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name;
-  if (input.slug !== undefined) updates.slug = input.slug;
 
   if (Object.keys(updates).length > 0) {
     await db.collection("genres").doc(genreId).update(updates);

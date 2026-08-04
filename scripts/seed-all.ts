@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { toVietnameseSlug } from "../src/utils/slug.js";
 
 const PROJECT_ID = process.env.PROJECT_ID || "novel-ecbcc";
 
@@ -779,16 +780,10 @@ async function seedNovels(db: admin.firestore.Firestore): Promise<string[]> {
 
   for (let i = 0; i < novelsData.length; i++) {
     const novel = novelsData[i];
-    const slug = novel.title
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/đ/g, "d")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+    const slug = toVietnameseSlug(novel.title);
 
     const createdAt = randomDate(180);
-    const docRef = db.collection("novels").doc();
+    const docRef = db.collection("novels").doc(slug);
 
     batch.set(docRef, {
       slug,

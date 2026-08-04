@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import { addFavorite, checkFavorite, listFavorites, removeFavorite } from "../services/favorite.js";
-import { parsePagination } from "../utils/pagination.js";
 import { getPublicNovel } from "../services/novel.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;

@@ -5,8 +5,8 @@ import {
   removeFromHistory,
   updateReadingProgress,
 } from "../services/history.js";
-import { parsePagination } from "../utils/pagination.js";
 import { getPublicNovel } from "../services/novel.js";
+import { parsePagination } from "../utils/pagination.js";
 
 type Variables = {
   user: unknown;

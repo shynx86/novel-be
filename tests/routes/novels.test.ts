@@ -73,10 +73,13 @@ beforeEach(() => {
 describe("GET /api/novels", () => {
   it("returns 200 with paginated novel list", async () => {
     mockCountGet.mockResolvedValue({ data: () => ({ count: 1 }) });
-    mockQueryGet.mockResolvedValue({
-      docs: [{ id: "novel-1", data: () => mockNovelDoc }],
-      empty: false,
-    });
+    mockQueryGet
+      .mockResolvedValueOnce({
+        docs: [{ id: "novel-1", data: () => mockNovelDoc }],
+        empty: false,
+      })
+      .mockResolvedValueOnce({ docs: [], empty: true })
+      .mockResolvedValueOnce({ docs: [], empty: true });
 
     const res = await app.request("/api/novels");
 
@@ -103,14 +106,6 @@ describe("GET /api/novels/:novelId", () => {
     mockGetAll.mockResolvedValueOnce([
       { exists: true, id: "author-1", data: () => ({ name: "Test Author" }) },
     ]);
-    // novel_translators query
-    mockQueryGet.mockResolvedValueOnce({
-      docs: [{ data: () => ({ novel_id: "novel-1", translator_id: "translator-1" }) }],
-    });
-    // getAll for translators
-    mockGetAll.mockResolvedValueOnce([
-      { exists: true, id: "translator-1", data: () => ({ name: "Test Translator" }) },
-    ]);
     // novel_genres query
     mockQueryGet.mockResolvedValueOnce({
       docs: [
@@ -131,7 +126,6 @@ describe("GET /api/novels/:novelId", () => {
     expect(body.data.title).toBe("Test Novel");
     expect(body.data.id).toBe("novel-1");
     expect(body.data.authors).toEqual([{ id: "author-1", name: "Test Author" }]);
-    expect(body.data.translators).toEqual([{ id: "translator-1", name: "Test Translator" }]);
     expect(body.data.genres).toEqual([
       { id: "genre-1", name: "Fantasy" },
       { id: "genre-2", name: "Adventure" },
@@ -141,7 +135,6 @@ describe("GET /api/novels/:novelId", () => {
   it("returns 200 with empty relations when none exist", async () => {
     mockDocGet.mockResolvedValueOnce({ exists: true, id: "novel-1", data: () => mockNovelDoc });
     mockQueryGet.mockResolvedValueOnce({ docs: [], empty: true }); // no authors
-    mockQueryGet.mockResolvedValueOnce({ docs: [], empty: true }); // no translators
     mockQueryGet.mockResolvedValueOnce({ docs: [], empty: true }); // no genres
 
     const res = await app.request("/api/novels/novel-1");
@@ -149,7 +142,6 @@ describe("GET /api/novels/:novelId", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.authors).toEqual([]);
-    expect(body.data.translators).toEqual([]);
     expect(body.data.genres).toEqual([]);
   });
 
@@ -167,7 +159,7 @@ describe("GET /api/novels/:novelId", () => {
 describe("GET /api/novels/:novelId/chapters", () => {
   it("returns 200 with paginated chapter list without content", async () => {
     // First get: novel existence check
-    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc });
+    mockDocGet.mockResolvedValue({ exists: true, data: () => mockNovelDoc });
     // Count query
     mockCountGet.mockResolvedValue({ data: () => ({ count: 3 }) });
     // Chapters query
@@ -188,7 +180,7 @@ describe("GET /api/novels/:novelId/chapters", () => {
   it("annotates subscription status when authenticated", async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
     // Novel existence check
-    mockDocGet.mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc });
+    mockDocGet.mockResolvedValue({ exists: true, data: () => mockNovelDoc });
     // Count
     mockCountGet.mockResolvedValue({ data: () => ({ count: 3 }) });
     // Chapters query
@@ -227,7 +219,9 @@ describe("GET /api/novels/:novelId/chapters", () => {
 describe("GET /api/novels/:novelId/chapters/:index", () => {
   it("returns 200 for free chapter without auth", async () => {
     const freeChapter = { ...mockPaidChapterWithContent, access_type: "free", price: 0 };
-    mockDocGet.mockResolvedValue({ exists: true, data: () => freeChapter });
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({ exists: true, data: () => freeChapter });
 
     const res = await app.request("/api/novels/novel-1/chapters/1");
 
@@ -238,7 +232,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
 
   it("returns 401 for free_auth chapter without auth", async () => {
     const authChapter = { ...mockPaidChapterWithContent, access_type: "free_auth", price: 0 };
-    mockDocGet.mockResolvedValue({ exists: true, data: () => authChapter });
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({ exists: true, data: () => authChapter });
 
     const res = await app.request("/api/novels/novel-1/chapters/2");
 
@@ -248,7 +244,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
   it("returns 200 for free_auth chapter with auth", async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
     const authChapter = { ...mockPaidChapterWithContent, access_type: "free_auth", price: 0 };
-    mockDocGet.mockResolvedValue({ exists: true, data: () => authChapter });
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({ exists: true, data: () => authChapter });
 
     const res = await app.request("/api/novels/novel-1/chapters/2", {
       headers: { Authorization: "Bearer valid-token" },
@@ -258,7 +256,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
   });
 
   it("returns 401 for paid chapter without auth", async () => {
-    mockDocGet.mockResolvedValue({ exists: true, data: () => mockPaidChapterWithContent });
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapterWithContent });
 
     const res = await app.request("/api/novels/novel-1/chapters/3");
 
@@ -267,8 +267,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
 
   it("returns 403 for paid chapter without subscription (includes price details)", async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
-    // Chapter doc
+    // Novel then chapter
     mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
       .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapterWithContent })
       // Novel subscription check (-1 = whole novel) → not subscribed
       .mockResolvedValueOnce({ exists: false, data: () => undefined })
@@ -291,8 +292,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
 
   it("returns 200 for paid chapter with chapter subscription", async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
-    // Chapter doc
+    // Novel then chapter
     mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
       .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapterWithContent })
       // Novel subscription check → not subscribed
       .mockResolvedValueOnce({ exists: false, data: () => undefined })
@@ -310,8 +312,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
 
   it("returns 200 for paid chapter with novel-level subscription", async () => {
     mockVerifyIdToken.mockResolvedValue({ uid: "user-1" });
-    // Chapter doc
+    // Novel then chapter
     mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
       .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapterWithContent })
       // Novel subscription check → subscribed
       .mockResolvedValueOnce({ exists: true, data: () => ({ user_id: "user-1" }) });
@@ -324,7 +327,9 @@ describe("GET /api/novels/:novelId/chapters/:index", () => {
   });
 
   it("returns 404 for nonexistent chapter", async () => {
-    mockDocGet.mockResolvedValue({ exists: false, data: () => undefined });
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({ exists: false, data: () => undefined });
 
     const res = await app.request("/api/novels/novel-1/chapters/999");
 

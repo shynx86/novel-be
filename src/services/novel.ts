@@ -5,8 +5,9 @@ import type {
   NovelUpdateInput,
   PaginatedResult,
 } from "../types/novel.js";
-import { NotFoundError } from "../utils/errors.js";
+import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+import { assertImmutableSlug, requireVietnameseSlug, toVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
 import { getNovelAuthors, getNovelGenres } from "./novel-relation.js";
 
@@ -174,9 +175,10 @@ export async function enrichNovelsWithRelations(novels: NovelDocument[]): Promis
 export async function createNovel(input: NovelCreateInput): Promise<NovelDocument> {
   const db = getFirestore();
   const now = new Date().toISOString();
+  const slug = requireVietnameseSlug(input.slug || input.title);
 
   const docData: Record<string, unknown> = {
-    slug: input.slug,
+    slug,
     title: input.title,
     description: input.description || "",
     cover_url: input.cover_url || "",
@@ -199,10 +201,17 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     docData.translator_id = input.translator_id;
   }
 
-  const ref = await db.collection("novels").add(docData);
-  logger.info("Novel created", { novelId: ref.id, title: input.title });
+  const ref = db.collection("novels").doc(slug);
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(ref);
+    if (existing.exists) {
+      throw new ConflictError("Novel with this slug already exists", { slug });
+    }
+    transaction.set(ref, docData);
+  });
+  logger.info("Novel created", { novelId: slug, title: input.title });
 
-  return novelDocToData(ref.id, docData);
+  return novelDocToData(slug, docData);
 }
 
 export async function getNovel(novelId: string): Promise<NovelDocument> {
@@ -232,14 +241,14 @@ export async function getPublicNovel(novelId: string): Promise<NovelDocument> {
 
 export async function getNovelBySlug(slug: string): Promise<NovelDocument> {
   const db = getFirestore();
-  const snapshot = await db.collection("novels").where("slug", "==", slug).limit(1).get();
-
-  if (snapshot.empty) {
+  const normalizedSlug = toVietnameseSlug(slug);
+  if (!normalizedSlug) {
     throw new NotFoundError("Novel not found");
   }
-
-  const doc = snapshot.docs[0];
-  return novelDocToData(doc.id, doc.data());
+  const doc = await db.collection("novels").doc(normalizedSlug).get();
+  const data = doc.data();
+  if (!doc.exists || !data) throw new NotFoundError("Novel not found");
+  return novelDocToData(doc.id, data);
 }
 
 export async function getPublicNovelBySlug(slug: string): Promise<NovelDocument> {
@@ -357,14 +366,14 @@ async function searchNovels(params: {
   }
 
   const lowerSearch = search.toLowerCase();
-  let query: admin.firestore.Query = db
+  const query: admin.firestore.Query = db
     .collection("novels")
     .orderBy("title")
     .startAt(lowerSearch)
     .endAt(`${lowerSearch}\uf8ff`);
 
   const snapshot = await query.get();
-  let novels = snapshot.docs
+  const novels = snapshot.docs
     .map((doc) => novelDocToData(doc.id, doc.data()))
     .filter(isPublicNovel)
     .filter((novel) => matchesFilters(novel, filters ?? []));
@@ -552,14 +561,14 @@ export async function listNovels(params: {
   // Standard query without junction filters
   if (params.search) {
     const lowerSearch = params.search.toLowerCase();
-    let query: admin.firestore.Query = db
+    const query: admin.firestore.Query = db
       .collection("novels")
       .orderBy("title_lowercase")
       .startAt(lowerSearch)
       .endAt(`${lowerSearch}\uf8ff`);
 
     const snapshot = await query.get();
-    let novels = snapshot.docs
+    const novels = snapshot.docs
       .map((doc) => novelDocToData(doc.id, doc.data()))
       .filter((novel) => {
         if (params.status && novel.status !== params.status) return false;
@@ -635,7 +644,7 @@ export async function listNovels(params: {
   }
 
   const snapshot = await query.limit(limit).get();
-  let novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
+  const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
 
   // Sort manually when translator_id filter is used
   if (params.translator_id) {
@@ -690,8 +699,10 @@ export async function listPublicNovels(params: {
 
     const normalizedSearch = params.search?.trim() ? normalizeNovelTitle(params.search) : undefined;
     const novels = (await getDocumentsByIds(db, "novels", matchingNovelIds))
-      .filter((doc) => doc.exists)
-      .map((doc) => novelDocToData(doc.id, doc.data()!))
+      .flatMap((doc) => {
+        const data = doc.data();
+        return doc.exists && data ? [novelDocToData(doc.id, data)] : [];
+      })
       .filter(
         (novel) =>
           isPublicNovel(novel) &&
@@ -745,10 +756,10 @@ export async function updateNovel(
   const db = getFirestore();
 
   const existing = await getNovel(novelId);
+  if (input.slug !== undefined) assertImmutableSlug(novelId, input.slug);
   const now = new Date().toISOString();
 
   const updates: Record<string, unknown> = { updated_at: now };
-  if (input.slug !== undefined) updates.slug = input.slug;
   if (input.title !== undefined) updates.title = input.title;
   if (input.title !== undefined) updates.title_lowercase = normalizeNovelTitle(input.title);
   if (input.description !== undefined) updates.description = input.description;

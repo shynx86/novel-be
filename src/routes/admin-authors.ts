@@ -53,6 +53,9 @@ adminAuthors.post("/", async (c) => {
   if (!body.name || typeof body.name !== "string") {
     throw new ValidationError("name is required", { field: "name" });
   }
+  if (body.slug !== undefined && typeof body.slug !== "string") {
+    throw new ValidationError("slug must be a string", { field: "slug" });
+  }
 
   const author = await createAuthor({
     name: body.name,
@@ -66,6 +69,10 @@ adminAuthors.post("/", async (c) => {
 adminAuthors.patch("/:authorId", async (c) => {
   const authorId = c.req.param("authorId");
   const body = await c.req.json();
+
+  if (body.slug !== undefined && typeof body.slug !== "string") {
+    throw new ValidationError("slug must be a string", { field: "slug" });
+  }
 
   const author = await updateAuthor(authorId, {
     name: body.name,

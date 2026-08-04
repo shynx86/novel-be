@@ -50,8 +50,9 @@ beforeEach(() => {
 describe("POST /api/subscriptions/chapter", () => {
   it("returns 200 on successful chapter subscription", async () => {
     setupAuth();
-    // Chapter doc (getChapter)
+    // Novel then chapter
     mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
       .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapter })
       // Novel subscription check (fast-fail) → not subscribed
       .mockResolvedValueOnce({ exists: false, data: () => undefined })
@@ -59,10 +60,13 @@ describe("POST /api/subscriptions/chapter", () => {
       .mockResolvedValueOnce({ exists: false, data: () => undefined });
 
     // Transaction
-    mockTransactionGet.mockResolvedValue({
-      exists: true,
-      data: () => ({ credits: 100, role: "user" }),
-    });
+    mockTransactionGet
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ credits: 100, role: "user" }),
+      })
+      .mockResolvedValueOnce({ exists: false })
+      .mockResolvedValueOnce({ exists: false });
     mockTransactionSet.mockResolvedValue(undefined);
     mockTransactionUpdate.mockResolvedValue(undefined);
 
@@ -86,15 +90,19 @@ describe("POST /api/subscriptions/chapter", () => {
   it("returns 402 when insufficient credits", async () => {
     setupAuth();
     mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
       .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapter })
       .mockResolvedValueOnce({ exists: false, data: () => undefined })
       .mockResolvedValueOnce({ exists: false, data: () => undefined });
 
     // Transaction: user has insufficient credits
-    mockTransactionGet.mockResolvedValue({
-      exists: true,
-      data: () => ({ credits: 5, role: "user" }),
-    });
+    mockTransactionGet
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ credits: 5, role: "user" }),
+      })
+      .mockResolvedValueOnce({ exists: false })
+      .mockResolvedValueOnce({ exists: false });
 
     const res = await app.request("/api/subscriptions/chapter", {
       method: "POST",
@@ -114,6 +122,7 @@ describe("POST /api/subscriptions/chapter", () => {
   it("returns 409 when already subscribed to chapter", async () => {
     setupAuth();
     mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
       .mockResolvedValueOnce({ exists: true, data: () => mockPaidChapter })
       .mockResolvedValueOnce({ exists: false, data: () => undefined })
       // Chapter already subscribed
@@ -133,10 +142,12 @@ describe("POST /api/subscriptions/chapter", () => {
 
   it("returns 400 for non-paid chapter", async () => {
     setupAuth();
-    mockDocGet.mockResolvedValueOnce({
-      exists: true,
-      data: () => ({ ...mockPaidChapter, access_type: "free", price: 0 }),
-    });
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ ...mockPaidChapter, access_type: "free", price: 0 }),
+      });
 
     const res = await app.request("/api/subscriptions/chapter", {
       method: "POST",
@@ -177,10 +188,12 @@ describe("POST /api/subscriptions/novel", () => {
       // Duplicate check → not subscribed
       .mockResolvedValueOnce({ exists: false, data: () => undefined });
 
-    mockTransactionGet.mockResolvedValue({
-      exists: true,
-      data: () => ({ credits: 200, role: "user" }),
-    });
+    mockTransactionGet
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ credits: 200, role: "user" }),
+      })
+      .mockResolvedValueOnce({ exists: false });
 
     const res = await app.request("/api/subscriptions/novel", {
       method: "POST",

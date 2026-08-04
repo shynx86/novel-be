@@ -19,6 +19,7 @@ import {
 } from "../services/novel.js";
 import { ForbiddenError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
+import { assertImmutableSlug } from "../utils/slug.js";
 
 type Variables = {
   user: unknown;
@@ -42,6 +43,9 @@ adminNovels.post("/", async (c) => {
   if (!body.title || typeof body.title !== "string") {
     throw new ValidationError("title is required", { field: "title" });
   }
+  if (body.slug !== undefined && typeof body.slug !== "string") {
+    throw new ValidationError("slug must be a string", { field: "slug" });
+  }
   if (
     userRole === "admin" &&
     body.publication_status !== undefined &&
@@ -57,12 +61,7 @@ adminNovels.post("/", async (c) => {
   const translatorId = isTranslator ? userId : body.translator_id;
 
   const novel = await createNovel({
-    slug:
-      body.slug ||
-      body.title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, ""),
+    slug: body.slug || body.title,
     title: body.title,
     description: body.description,
     cover_url: body.cover_url,
@@ -139,6 +138,13 @@ adminNovels.patch("/:novelId", async (c) => {
   const body = await c.req.json();
   const userId = c.get("userId") as string;
   const userRole = c.get("userRole") as string;
+
+  if (body.slug !== undefined) {
+    if (typeof body.slug !== "string") {
+      throw new ValidationError("slug must be a string", { field: "slug" });
+    }
+    assertImmutableSlug(novelId, body.slug);
+  }
 
   if (
     userRole === "admin" &&
