@@ -32,6 +32,11 @@ interface UserDocumentPlan {
   orphanDeletes: admin.firestore.DocumentReference[];
 }
 
+interface JunctionDocumentPlan {
+  writes: PlannedWrite[];
+  orphanDeletes: admin.firestore.DocumentReference[];
+}
+
 const applyChanges = process.argv.includes("--apply");
 const projectId = process.env.GOOGLE_CLOUD_PROJECT || process.env.PROJECT_ID || "";
 
@@ -128,9 +133,9 @@ async function collectJunctionWrites(
   entityField: "author_id" | "genre_id",
   novelResolver: Map<string, string>,
   entityResolver: Map<string, string>,
-  errors: string[],
-): Promise<PlannedWrite[]> {
+): Promise<JunctionDocumentPlan> {
   const snapshot = await db.collection(collection).get();
+  const orphanDeletes: admin.firestore.DocumentReference[] = [];
   const planned = new Map<
     string,
     { sources: admin.firestore.DocumentReference[]; data: admin.firestore.DocumentData }
@@ -138,14 +143,14 @@ async function collectJunctionWrites(
 
   for (const doc of snapshot.docs) {
     const data = doc.data();
-    const novelId = resolveId(novelResolver, data.novel_id, `${doc.ref.path}.novel_id`, errors);
-    const entityId = resolveId(
-      entityResolver,
-      data[entityField],
-      `${doc.ref.path}.${entityField}`,
-      errors,
-    );
-    if (!novelId || !entityId) continue;
+    const novelId =
+      typeof data.novel_id === "string" ? novelResolver.get(data.novel_id) : undefined;
+    const entityId =
+      typeof data[entityField] === "string" ? entityResolver.get(data[entityField]) : undefined;
+    if (!novelId || !entityId) {
+      orphanDeletes.push(doc.ref);
+      continue;
+    }
 
     const destinationId = `${novelId}:${entityId}`;
     const destinationData = { ...data, novel_id: novelId, [entityField]: entityId };
@@ -158,22 +163,37 @@ async function collectJunctionWrites(
     }
   }
 
-  return [...planned].map(([destinationId, plan]) => ({
-    sources: plan.sources,
-    destination: db.collection(collection).doc(destinationId),
-    data: plan.data,
-    needsWrite:
-      plan.sources.length > 1 ||
-      !plan.sources.some((source) => source.id === destinationId) ||
-      plan.sources.some((source) => {
-        if (source.id !== destinationId) return false;
-        const sourceData = snapshot.docs.find((doc) => doc.id === source.id)?.data();
-        return (
-          sourceData?.novel_id !== plan.data.novel_id ||
-          sourceData?.[entityField] !== plan.data[entityField]
-        );
-      }),
-  }));
+  return {
+    writes: [...planned].map(([destinationId, plan]) => ({
+      sources: plan.sources,
+      destination: db.collection(collection).doc(destinationId),
+      data: plan.data,
+      needsWrite:
+        plan.sources.length > 1 ||
+        !plan.sources.some((source) => source.id === destinationId) ||
+        plan.sources.some((source) => {
+          if (source.id !== destinationId) return false;
+          const sourceData = snapshot.docs.find((doc) => doc.id === source.id)?.data();
+          return (
+            sourceData?.novel_id !== plan.data.novel_id ||
+            sourceData?.[entityField] !== plan.data[entityField]
+          );
+        }),
+    })),
+    orphanDeletes,
+  };
+}
+
+async function collectNovelTranslatorOrphanDeletes(
+  novelResolver: Map<string, string>,
+): Promise<admin.firestore.DocumentReference[]> {
+  const snapshot = await db.collection("novel_translators").get();
+  return snapshot.docs
+    .filter((doc) => {
+      const novelId = doc.data().novel_id;
+      return typeof novelId !== "string" || !novelResolver.has(novelId);
+    })
+    .map((doc) => doc.ref);
 }
 
 async function collectSubscriptionWrites(
@@ -216,12 +236,29 @@ async function collectSubscriptionWrites(
 class BatchedWriter {
   private batch = db.batch();
   private count = 0;
+  private batchNumber = 0;
+  private operations: Array<{ type: "SET" | "DELETE"; path: string }> = [];
+
+  private async commitCurrentBatch(): Promise<void> {
+    if (this.count === 0) return;
+
+    const operations = this.operations;
+    await this.batch.commit();
+
+    this.batchNumber++;
+    console.log(`COMMITTED batch ${this.batchNumber}: ${operations.length} operation(s)`);
+    for (const operation of operations) {
+      console.log(`COMMITTED ${operation.type} ${operation.path}`);
+    }
+
+    this.batch = db.batch();
+    this.count = 0;
+    this.operations = [];
+  }
 
   private async rotateIfNeeded(): Promise<void> {
     if (this.count < 400) return;
-    await this.batch.commit();
-    this.batch = db.batch();
-    this.count = 0;
+    await this.commitCurrentBatch();
   }
 
   async set(
@@ -231,19 +268,18 @@ class BatchedWriter {
     await this.rotateIfNeeded();
     this.batch.set(ref, data);
     this.count++;
+    this.operations.push({ type: "SET", path: ref.path });
   }
 
   async delete(ref: admin.firestore.DocumentReference): Promise<void> {
     await this.rotateIfNeeded();
     this.batch.delete(ref);
     this.count++;
+    this.operations.push({ type: "DELETE", path: ref.path });
   }
 
   async flush(): Promise<void> {
-    if (this.count === 0) return;
-    await this.batch.commit();
-    this.batch = db.batch();
-    this.count = 0;
+    await this.commitCurrentBatch();
   }
 }
 
@@ -353,29 +389,29 @@ async function migrate(): Promise<void> {
     loadEntityPlans("genre", "name", errors),
   ]);
 
-  const [authorJunctions, genreJunctions, subscriptions, userDocumentPlan] = await Promise.all([
+  const [
+    authorJunctionPlan,
+    genreJunctionPlan,
+    subscriptions,
+    userDocumentPlan,
+    translatorOrphanDeletes,
+  ] = await Promise.all([
     collectJunctionWrites(
       "novel_authors",
       "author_id",
       novelResult.resolver,
       authorResult.resolver,
-      errors,
     ),
-    collectJunctionWrites(
-      "novel_genres",
-      "genre_id",
-      novelResult.resolver,
-      genreResult.resolver,
-      errors,
-    ),
+    collectJunctionWrites("novel_genres", "genre_id", novelResult.resolver, genreResult.resolver),
     collectSubscriptionWrites(novelResult.resolver, errors),
     collectUserDocumentWrites(novelResult.resolver, errors),
+    collectNovelTranslatorOrphanDeletes(novelResult.resolver),
   ]);
 
   const entities = [...novelResult.plans, ...authorResult.plans, ...genreResult.plans];
   const dependentWrites = [
-    ...authorJunctions,
-    ...genreJunctions,
+    ...authorJunctionPlan.writes,
+    ...genreJunctionPlan.writes,
     ...subscriptions,
     ...userDocumentPlan.writes,
   ];
@@ -387,7 +423,13 @@ async function migrate(): Promise<void> {
       write.sources.filter((source) => source.path !== write.destination.path),
     ),
   );
-  const orphanDeletes = uniqueReferences(userDocumentPlan.orphanDeletes);
+  const orphanJunctionDeletes = uniqueReferences([
+    ...authorJunctionPlan.orphanDeletes,
+    ...genreJunctionPlan.orphanDeletes,
+    ...translatorOrphanDeletes,
+  ]);
+  const orphanUserDocumentDeletes = uniqueReferences(userDocumentPlan.orphanDeletes);
+  const orphanDeletes = uniqueReferences([...orphanJunctionDeletes, ...orphanUserDocumentDeletes]);
   const mergedEntities = entities.filter((plan) => plan.merged);
   const retainedAuthors = entities.filter((plan) => plan.retainedUuid);
   const deduplicatedDependents = dependentWrites.reduce(
@@ -409,8 +451,10 @@ async function migrate(): Promise<void> {
   console.log(`Dependent moves: ${dependentDeletes.length}`);
   console.log(`Dependent deduplications: ${deduplicatedDependents}`);
   console.log(`Planned writes: ${plannedWrites}`);
-  console.log(`Orphan deletes: ${orphanDeletes.length}`);
-  for (const ref of orphanDeletes) console.log(`- ${ref.path}`);
+  console.log(`Orphan junction deletes: ${orphanJunctionDeletes.length}`);
+  for (const ref of orphanJunctionDeletes) console.log(`- ${ref.path}`);
+  console.log(`Orphan user-document deletes: ${orphanUserDocumentDeletes.length}`);
+  for (const ref of orphanUserDocumentDeletes) console.log(`- ${ref.path}`);
 
   if (errors.length > 0) {
     console.error(`Preflight failed with ${errors.length} error(s):`);
