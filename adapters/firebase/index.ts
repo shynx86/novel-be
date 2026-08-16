@@ -1,9 +1,11 @@
 import type { Request, Response } from "express";
 import { onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2/options";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
 setGlobalOptions({ region: "asia-southeast1" });
 import { app } from "../../src/app.js";
+import { publishDueChapters } from "../../src/services/chapter-publication.js";
 
 const handler = async (req: Request, res: Response) => {
   const url = `https://${req.headers.host}${req.url}`;
@@ -43,4 +45,16 @@ export const api = onRequest(
     invoker: "public",
   },
   handler,
+);
+
+export const publishScheduledChapters = onSchedule(
+  {
+    schedule: "every 1 minutes",
+    timeZone: "UTC",
+    timeoutSeconds: 60,
+    retryCount: 3,
+  },
+  async () => {
+    await publishDueChapters();
+  },
 );

@@ -95,6 +95,7 @@ export async function listFavorites(
                 ? "draft"
                 : "public") as NovelDocument["publication_status"],
               chapter_count: novelData.chapter_count || 0,
+              public_chapter_count: novelData.public_chapter_count ?? novelData.chapter_count ?? 0,
               total_word_count: novelData.total_word_count || 0,
               rating: novelData.rating ?? 0,
               views: novelData.views ?? 0,

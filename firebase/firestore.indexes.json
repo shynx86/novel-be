@@ -76,7 +76,26 @@
     {
       "collectionGroup": "chapters",
       "queryScope": "COLLECTION_GROUP",
-      "fields": [{ "fieldPath": "updated_at", "order": "DESCENDING" }]
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "public_at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chapters",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "public_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "chapters",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "index", "order": "ASCENDING" }
+      ]
     },
     {
       "collectionGroup": "novels",

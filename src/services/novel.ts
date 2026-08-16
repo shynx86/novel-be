@@ -22,6 +22,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     // Documents created before this field existed remain publicly available.
     publication_status: data.publication_status === "draft" ? "draft" : "public",
     chapter_count: data.chapter_count || 0,
+    public_chapter_count: data.public_chapter_count ?? data.chapter_count ?? 0,
     total_word_count: data.total_word_count || 0,
     rating: data.rating ?? 0,
     views: data.views ?? 0,
@@ -193,6 +194,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     status: input.status || "ongoing",
     publication_status: input.publication_status || "draft",
     chapter_count: 0,
+    public_chapter_count: 0,
     total_word_count: 0,
     rating: input.rating ?? 0,
     views: input.views ?? 0,
@@ -273,7 +275,7 @@ export async function listNovelsForSitemap(): Promise<
   const db = getFirestore();
   const snapshot = await db
     .collection("novels")
-    .select("slug", "chapter_count", "updated_at")
+    .select("slug", "chapter_count", "public_chapter_count", "updated_at")
     .get();
 
   return snapshot.docs
@@ -282,7 +284,7 @@ export async function listNovelsForSitemap(): Promise<
     .map((novel) => ({
       id: novel.id,
       slug: novel.slug,
-      chapter_count: novel.chapter_count,
+      chapter_count: novel.public_chapter_count,
       updated_at: novel.updated_at,
     }));
 }

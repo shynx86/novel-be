@@ -1,6 +1,7 @@
 export type NovelStatus = "ongoing" | "completed" | "hiatus";
 export type NovelPublicationStatus = "draft" | "public";
 export type ChapterAccessType = "free" | "free_auth" | "paid";
+export type ChapterPublicationStatus = "draft" | "scheduled" | "public";
 export type SubscriptionType = "chapter" | "novel";
 
 export interface NovelDocument {
@@ -12,6 +13,7 @@ export interface NovelDocument {
   status: NovelStatus;
   publication_status: NovelPublicationStatus;
   chapter_count: number;
+  public_chapter_count: number;
   total_word_count: number;
   rating: number;
   views: number;
@@ -64,6 +66,8 @@ export interface ChapterDocument {
   word_count: number;
   access_type: ChapterAccessType;
   price: number;
+  publication_status: ChapterPublicationStatus;
+  public_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +77,8 @@ export interface ChapterCreateInput {
   content: string;
   access_type?: ChapterAccessType;
   price?: number;
+  publication_status?: ChapterPublicationStatus;
+  public_at?: string | null;
 }
 
 export interface ChapterUpdateInput {
@@ -80,6 +86,8 @@ export interface ChapterUpdateInput {
   content?: string;
   access_type?: ChapterAccessType;
   price?: number;
+  publication_status?: ChapterPublicationStatus;
+  public_at?: string | null;
 }
 
 export interface NewestChapterDocument {
@@ -90,6 +98,7 @@ export interface NewestChapterDocument {
   title: string;
   access_type: ChapterAccessType;
   price: number;
+  public_at: string;
   updated_at: string;
 }
 

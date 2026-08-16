@@ -1,8 +1,9 @@
 import type admin from "firebase-admin";
-import type { NovelDocument } from "../types/novel.js";
+import type { ChapterPublicationStatus, NovelDocument } from "../types/novel.js";
 import { NotFoundError, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { requireVietnameseSlug } from "../utils/slug.js";
+import { resolveChapterPublication } from "./chapter.js";
 import { getFirestore } from "./firebase.js";
 import { setNovelAuthors, setNovelGenres } from "./novel-relation.js";
 
@@ -25,6 +26,8 @@ interface ChapterInput {
   content: string;
   access_type?: "free" | "free_auth" | "paid";
   price?: number;
+  publication_status?: ChapterPublicationStatus;
+  public_at?: string | null;
 }
 
 interface UpsertChaptersInput {
@@ -77,6 +80,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
   if (!existingNovel.exists) {
     novelData.publication_status = input.publication_status || "draft";
     novelData.chapter_count = 0;
+    novelData.public_chapter_count = 0;
     novelData.total_word_count = 0;
     novelData.rating = 0;
     novelData.views = 0;
@@ -159,6 +163,10 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
       input.publication_status ??
       (existingNovel.data()?.publication_status === "draft" ? "draft" : "public"),
     chapter_count: (existingNovel.data()?.chapter_count as number) ?? 0,
+    public_chapter_count:
+      (existingNovel.data()?.public_chapter_count as number) ??
+      (existingNovel.data()?.chapter_count as number) ??
+      0,
     total_word_count: (existingNovel.data()?.total_word_count as number) ?? 0,
     rating: (existingNovel.data()?.rating as number) ?? 0,
     views: (existingNovel.data()?.views as number) ?? 0,
@@ -226,6 +234,7 @@ export async function upsertNovelChapters(input: UpsertChaptersInput): Promise<{
       .doc(String(chapter.index));
 
     const existingChapter = await chapterRef.get();
+    const existingData = existingChapter.data();
 
     const chapterData: Record<string, unknown> = {
       index: chapter.index,
@@ -236,6 +245,39 @@ export async function upsertNovelChapters(input: UpsertChaptersInput): Promise<{
       price: chapter.access_type === "paid" ? (chapter.price ?? 0) : 0,
       updated_at: now,
     };
+
+    if (
+      !existingChapter.exists ||
+      !existingData?.publication_status ||
+      chapter.publication_status !== undefined ||
+      chapter.public_at !== undefined
+    ) {
+      const existingPublication = existingChapter.exists
+        ? {
+            publication_status:
+              existingData?.publication_status === "draft" ||
+              existingData?.publication_status === "scheduled"
+                ? existingData.publication_status
+                : ("public" as const),
+            public_at:
+              existingData?.public_at ??
+              existingData?.created_at ??
+              existingData?.updated_at ??
+              now,
+          }
+        : undefined;
+      Object.assign(
+        chapterData,
+        resolveChapterPublication(
+          {
+            publication_status: chapter.publication_status,
+            public_at: chapter.public_at,
+          },
+          now,
+          existingPublication,
+        ),
+      );
+    }
 
     if (!existingChapter.exists) {
       chapterData.created_at = now;
@@ -255,16 +297,22 @@ export async function upsertNovelChapters(input: UpsertChaptersInput): Promise<{
     .collection("novels")
     .doc(novelId)
     .collection("chapters")
-    .select("word_count")
+    .select("word_count", "publication_status")
     .get();
 
   let totalWordCount = 0;
+  let publicChapterCount = 0;
   for (const doc of allChapters.docs) {
-    totalWordCount += (doc.data().word_count as number) || 0;
+    const data = doc.data();
+    totalWordCount += (data.word_count as number) || 0;
+    if (data.publication_status !== "draft" && data.publication_status !== "scheduled") {
+      publicChapterCount += 1;
+    }
   }
 
   await db.collection("novels").doc(novelId).update({
     chapter_count: allChapters.size,
+    public_chapter_count: publicChapterCount,
     total_word_count: totalWordCount,
     updated_at: now,
   });

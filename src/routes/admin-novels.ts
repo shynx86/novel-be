@@ -252,12 +252,31 @@ adminNovels.post("/:novelId/chapters", async (c) => {
       field: "access_type",
     });
   }
+  if (
+    body.publication_status !== undefined &&
+    !["draft", "scheduled", "public"].includes(body.publication_status)
+  ) {
+    throw new ValidationError("publication_status must be one of: draft, scheduled, public", {
+      field: "publication_status",
+    });
+  }
+  if (
+    body.public_at !== undefined &&
+    body.public_at !== null &&
+    typeof body.public_at !== "string"
+  ) {
+    throw new ValidationError("public_at must be an ISO 8601 datetime or null", {
+      field: "public_at",
+    });
+  }
 
   const chapter = await createChapter(novelId, {
     title: body.title,
     content: body.content,
     access_type: body.access_type,
     price: body.price,
+    publication_status: body.publication_status,
+    public_at: body.public_at,
   });
 
   return c.json({ data: chapter }, 201);
@@ -302,12 +321,31 @@ adminNovels.patch("/:novelId/chapters/:index", async (c) => {
       field: "access_type",
     });
   }
+  if (
+    body.publication_status !== undefined &&
+    !["draft", "scheduled", "public"].includes(body.publication_status)
+  ) {
+    throw new ValidationError("publication_status must be one of: draft, scheduled, public", {
+      field: "publication_status",
+    });
+  }
+  if (
+    body.public_at !== undefined &&
+    body.public_at !== null &&
+    typeof body.public_at !== "string"
+  ) {
+    throw new ValidationError("public_at must be an ISO 8601 datetime or null", {
+      field: "public_at",
+    });
+  }
 
   const chapter = await updateChapter(novelId, index, {
     title: body.title,
     content: body.content,
     access_type: body.access_type,
     price: body.price,
+    publication_status: body.publication_status,
+    public_at: body.public_at,
   });
 
   return c.json({ data: chapter }, 200);

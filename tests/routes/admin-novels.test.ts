@@ -215,6 +215,30 @@ describe("DELETE /api/admin/novels/:novelId", () => {
 // ─── POST /api/admin/novels/:novelId/chapters ──────────────────────────
 
 describe("POST /api/admin/novels/:novelId/chapters", () => {
+  it("creates a scheduled chapter with a normalized public time", async () => {
+    setupAdminAuth();
+    mockTransactionGet.mockResolvedValue({ empty: true, docs: [] });
+
+    const res = await app.request("/api/admin/novels/novel-1/chapters", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer admin-token",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "Scheduled chapter",
+        content: "Content",
+        publication_status: "scheduled",
+        public_at: "2099-01-01T07:00:00+07:00",
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.data.publication_status).toBe("scheduled");
+    expect(body.data.public_at).toBe("2099-01-01T00:00:00.000Z");
+  });
+
   it("returns 201 with created chapter", async () => {
     setupAdminAuth();
     // Transaction: get existing chapters (empty)
