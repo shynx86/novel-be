@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware, requirePermission } from "../middleware/authorization.js";
 import { listTopupHistory, topUp } from "../services/credit.js";
 import { ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
@@ -8,12 +8,11 @@ import { parsePagination } from "../utils/pagination.js";
 type Variables = {
   user: unknown;
   userId: string;
-  isAdmin: boolean;
 };
 
 const adminCredits = new Hono<{ Variables: Variables }>();
 
-adminCredits.use("/*", authMiddleware, adminMiddleware);
+adminCredits.use("/*", authMiddleware, loadActorMiddleware, requirePermission("credits.manage"));
 
 // POST /api/admin/credits/topup
 adminCredits.post("/topup", async (c) => {

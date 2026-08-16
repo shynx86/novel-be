@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware, requirePermission } from "../middleware/authorization.js";
 import { getAdminApp } from "../services/firebase.js";
 import { ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 
 const adminUpload = new Hono();
 
-adminUpload.use("/*", authMiddleware, adminMiddleware);
+adminUpload.use("/*", authMiddleware, loadActorMiddleware, requirePermission("media.upload"));
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const ALLOWED_FOLDERS = ["cover_imgs", "author_imgs", "translator_imgs"] as const;

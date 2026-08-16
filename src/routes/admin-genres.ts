@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware, requirePermission } from "../middleware/authorization.js";
 import { getFirestore } from "../services/firebase.js";
 import { createGenre, deleteGenre, listGenresAdmin, updateGenre } from "../services/genre-admin.js";
 import { getNovelsByGenre } from "../services/novel-relation.js";
@@ -10,7 +10,7 @@ import { parsePagination } from "../utils/pagination.js";
 
 const adminGenres = new Hono();
 
-adminGenres.use("/*", authMiddleware, adminMiddleware);
+adminGenres.use("/*", authMiddleware, loadActorMiddleware, requirePermission("genres.manage"));
 
 adminGenres.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);

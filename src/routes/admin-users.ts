@@ -1,14 +1,25 @@
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import {
+  assertAnyPermission,
+  loadActorMiddleware,
+  requirePermission,
+} from "../middleware/authorization.js";
 import { deleteUser, getUser, listUsers, updateUser } from "../services/user-admin.js";
+import type { Actor } from "../types/auth.js";
+import { ForbiddenError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
-const adminUsers = new Hono();
+type Variables = {
+  actor: Actor;
+  userId: string;
+};
 
-adminUsers.use("/*", authMiddleware, adminMiddleware);
+const adminUsers = new Hono<{ Variables: Variables }>();
 
-adminUsers.get("/", async (c) => {
+adminUsers.use("/*", authMiddleware, loadActorMiddleware);
+
+adminUsers.get("/", requirePermission("users.view"), async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
   const search = c.req.query("search") || undefined;
 
@@ -16,7 +27,7 @@ adminUsers.get("/", async (c) => {
   return c.json({ data: result }, 200);
 });
 
-adminUsers.get("/:userId", async (c) => {
+adminUsers.get("/:userId", requirePermission("users.view"), async (c) => {
   const userId = c.req.param("userId");
   const user = await getUser(userId);
   return c.json({ data: user }, 200);
@@ -25,6 +36,21 @@ adminUsers.get("/:userId", async (c) => {
 adminUsers.patch("/:userId", async (c) => {
   const userId = c.req.param("userId");
   const body = await c.req.json();
+  const actor = c.get("actor");
+
+  assertAnyPermission(actor, ["users.update", "roles.assign", "credits.manage"]);
+  if (body.display_name !== undefined) {
+    assertAnyPermission(actor, ["users.update"]);
+  }
+  if (body.role !== undefined) {
+    assertAnyPermission(actor, ["roles.assign"]);
+    if (userId === actor.userId && body.role !== actor.role) {
+      throw new ForbiddenError("You cannot change your own role");
+    }
+  }
+  if (body.credits !== undefined) {
+    assertAnyPermission(actor, ["credits.manage"]);
+  }
 
   const user = await updateUser(userId, {
     display_name: body.display_name,
@@ -34,8 +60,11 @@ adminUsers.patch("/:userId", async (c) => {
   return c.json({ data: user }, 200);
 });
 
-adminUsers.delete("/:userId", async (c) => {
+adminUsers.delete("/:userId", requirePermission("users.delete"), async (c) => {
   const userId = c.req.param("userId");
+  if (userId === c.get("actor").userId) {
+    throw new ForbiddenError("You cannot delete your own user");
+  }
   await deleteUser(userId);
   return c.json({ data: { deleted: true } }, 200);
 });

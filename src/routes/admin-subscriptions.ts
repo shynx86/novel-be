@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware, requirePermission } from "../middleware/authorization.js";
 import {
   deleteSubscription,
   getSubscription,
@@ -10,7 +10,12 @@ import { parsePagination } from "../utils/pagination.js";
 
 const adminSubscriptions = new Hono();
 
-adminSubscriptions.use("/*", authMiddleware, adminMiddleware);
+adminSubscriptions.use(
+  "/*",
+  authMiddleware,
+  loadActorMiddleware,
+  requirePermission("subscriptions.manage"),
+);
 
 adminSubscriptions.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);

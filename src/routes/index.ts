@@ -6,6 +6,7 @@ import { adminCredits } from "./admin-credits.js";
 import { adminGenres } from "./admin-genres.js";
 import { adminNovels } from "./admin-novels.js";
 import { adminPush } from "./admin-push.js";
+import { adminRoles } from "./admin-roles.js";
 import { adminSubscriptions } from "./admin-subscriptions.js";
 import { adminUpload } from "./admin-upload.js";
 import { adminUsers } from "./admin-users.js";
@@ -34,6 +35,7 @@ export function registerRoutes(app: Hono): void {
   app.route("/api/admin/auth", adminAuth);
   app.route("/api/admin/novels", adminNovels);
   app.route("/api/admin/push", adminPush);
+  app.route("/api/admin/roles", adminRoles);
   app.route("/api/admin/credits", adminCredits);
   app.route("/api/admin/genres", adminGenres);
   app.route("/api/admin/users", adminUsers);
