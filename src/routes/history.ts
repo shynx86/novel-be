@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import {
+  clearReadingHistory,
   listReadingHistory,
   removeFromHistory,
   updateReadingProgress,
@@ -22,6 +23,12 @@ history.get("/", authMiddleware, async (c) => {
 
   const result = await listReadingHistory(userId, { page, limit });
   return c.json({ data: result }, 200);
+});
+
+history.delete("/", authMiddleware, async (c) => {
+  const userId = c.get("userId");
+  await clearReadingHistory(userId);
+  return c.json({ data: { success: true } }, 200);
 });
 
 // POST /api/history/:novelId

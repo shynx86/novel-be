@@ -81,7 +81,7 @@ export async function enrichNovelWithRelations(novel: NovelDocument): Promise<No
     getNovelGenres(novel.id),
   ]);
 
-  let translator: { id: string; name: string } | undefined;
+  let translator: { id: string; name: string; username: string } | undefined;
   if (novel.translator_id) {
     try {
       const userDoc = await db.collection("users").doc(novel.translator_id).get();
@@ -89,7 +89,8 @@ export async function enrichNovelWithRelations(novel: NovelDocument): Promise<No
         const userData = userDoc.data();
         translator = {
           id: novel.translator_id,
-          name: userData?.display_name || userData?.email || "",
+          name: userData?.display_name || userData?.username || "Dịch giả",
+          username: userData?.username || `user_${novel.translator_id}`,
         };
       }
     } catch {
@@ -154,7 +155,14 @@ export async function enrichNovelsWithRelations(novels: NovelDocument[]): Promis
       .filter((doc) => doc.exists)
       .map((doc) => {
         const data = doc.data();
-        return [doc.id, { id: doc.id, name: data?.display_name || data?.email || "" }];
+        return [
+          doc.id,
+          {
+            id: doc.id,
+            name: data?.display_name || data?.username || "Dịch giả",
+            username: data?.username || `user_${doc.id}`,
+          },
+        ];
       }),
   );
 
@@ -715,6 +723,28 @@ export async function listPublicNovels(params: {
           ? normalizeNovelTitle(a.title).localeCompare(normalizeNovelTitle(b.title))
           : b.created_at.localeCompare(a.created_at),
       );
+    const total = novels.length;
+    const items = novels.slice((page - 1) * limit, page * limit);
+    return { items: await enrichNovelsWithRelations(items), page, limit, total };
+  }
+
+  // A translator profile must remain queryable even when composite indexes have not yet
+  // finished deploying. Translator portfolios are small enough to filter and sort in memory.
+  if (params.translator_id) {
+    const snapshot = await db
+      .collection("novels")
+      .where("translator_id", "==", params.translator_id)
+      .get();
+    const normalizedSearch = params.search?.trim() ? normalizeNovelTitle(params.search) : undefined;
+    const novels = snapshot.docs
+      .map((doc) => novelDocToData(doc.id, doc.data()))
+      .filter(
+        (novel) =>
+          isPublicNovel(novel) &&
+          (!params.status || novel.status === params.status) &&
+          (!normalizedSearch || normalizeNovelTitle(novel.title).startsWith(normalizedSearch)),
+      )
+      .sort((left, right) => right.created_at.localeCompare(left.created_at));
     const total = novels.length;
     const items = novels.slice((page - 1) * limit, page * limit);
     return { items: await enrichNovelsWithRelations(items), page, limit, total };

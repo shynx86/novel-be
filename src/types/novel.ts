@@ -24,7 +24,7 @@ export interface NovelDocument {
   updated_at: string;
   genres?: { id: string; name: string }[];
   authors?: { id: string; name: string }[];
-  translator?: { id: string; name: string };
+  translator?: { id: string; name: string; username: string };
 }
 
 export interface NovelCreateInput {
