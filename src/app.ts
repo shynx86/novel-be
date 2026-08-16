@@ -12,7 +12,13 @@ const app = new Hono();
 // Global middleware
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3001", "https://novel-fe-six.vercel.app"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://novel-fe-six.vercel.app",
+      "https://haonguyet.com",
+      "https://www.haonguyet.com",
+    ],
     allowMethods: ["GET", "POST", "PATCH", "DELETE"],
     allowHeaders: ["Content-Type", "Authorization"],
     credentials: true,
