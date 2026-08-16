@@ -76,7 +76,8 @@ interface NovelInput {
 const novelsData: NovelInput[] = [
   {
     title: "Phàm Nhân Tu Tiên",
-    description: "Một thiếu niên平凡生活在 một làng quê nhỏ, tình cờ phát hiện một viên thuốc tiên cổ xưa, từ đó bước trên con đường tu tiên.",
+    description:
+      "Một thiếu niên平凡生活在 một làng quê nhỏ, tình cờ phát hiện một viên thuốc tiên cổ xưa, từ đó bước trên con đường tu tiên.",
     author: authors[0],
     genres: ["Tiên Hiệp", "Phiêu Lưu"],
     status: "ongoing",
@@ -87,7 +88,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Kiếm Vương Già Thế Gian",
-    description: "Một kiếm tu bị phế bỏ thiên phú,凭借 một thanh kiếm gãy tái xuất giang hồ, viết nên truyền thuyết.",
+    description:
+      "Một kiếm tu bị phế bỏ thiên phú,凭借 một thanh kiếm gãy tái xuất giang hồ, viết nên truyền thuyết.",
     author: authors[1],
     genres: ["Kiếm Hiệp", "Ngược"],
     status: "completed",
@@ -98,7 +100,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Yêu Anh Từ Cái Nhìn Đầu Tiên",
-    description: "Cô gái xinh đẹp nhất trường đại học phải lòng game thủ nghèo, tình yêu nảy nở trong thế giới ảo.",
+    description:
+      "Cô gái xinh đẹp nhất trường đại học phải lòng game thủ nghèo, tình yêu nảy nở trong thế giới ảo.",
     author: authors[2],
     genres: ["Ngôn Tình", "Sủng"],
     status: "completed",
@@ -109,7 +112,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Hệ Thống Sát Thủ",
-    description: "Một sát thủ bị sát hại sống lại với hệ thống, mỗi lần hoàn thành nhiệm vụ sẽ nhận được kỹ năng mới.",
+    description:
+      "Một sát thủ bị sát hại sống lại với hệ thống, mỗi lần hoàn thành nhiệm vụ sẽ nhận được kỹ năng mới.",
     author: authors[3],
     genres: ["Hệ Thống", "Đô Thị"],
     status: "ongoing",
@@ -120,7 +124,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Xuyên Nhanh: Vai Phản Diện Bị Sủng Lên Mây",
-    description: "Cô gái xuyên vào các tiểu thuyết, mỗi thế giới đều có một nam phản diện đẹp trai đem lòng yêu cô.",
+    description:
+      "Cô gái xuyên vào các tiểu thuyết, mỗi thế giới đều có một nam phản diện đẹp trai đem lòng yêu cô.",
     author: authors[4],
     genres: ["Xuyên Nhanh", "Sủng"],
     status: "ongoing",
@@ -131,7 +136,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Đô Thị Tiên Tôn",
-    description: "Một tiên nhân chuyển sinh về都市, dùng pháp thuật giải quyết vấn đề đời thường, che giấu thân phận.",
+    description:
+      "Một tiên nhân chuyển sinh về都市, dùng pháp thuật giải quyết vấn đề đời thường, che giấu thân phận.",
     author: authors[5],
     genres: ["Đô Thị", "Tiên Hiệp"],
     status: "ongoing",
@@ -142,7 +148,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Trọng Sinh Chi Khoa Học Ma Vương",
-    description: "Ma Vương đại thiên cựu thế giới bị đánh bại, trọng sinh làm học sinh cấp ba, dùng kiến thức khoa học chinh phục thế giới mới.",
+    description:
+      "Ma Vương đại thiên cựu thế giới bị đánh bại, trọng sinh làm học sinh cấp ba, dùng kiến thức khoa học chinh phục thế giới mới.",
     author: authors[6],
     genres: ["Trọng Sinh", "Khoa Huyễn"],
     status: "completed",
@@ -153,7 +160,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Huyền Huyễn: Ta Có Một Cái Nông Trại",
-    description: "Xuyên qua thế giới huyền huyễn, mở nông trại thần bí, trồng linh dược, nuôi thần thú, từ từ cường đại.",
+    description:
+      "Xuyên qua thế giới huyền huyễn, mở nông trại thần bí, trồng linh dược, nuôi thần thú, từ từ cường đại.",
     author: authors[7],
     genres: ["Huyền Huyễn", "Điền Văn"],
     status: "ongoing",
@@ -164,7 +172,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Võng Du: Thiên Hạ Vô Song",
-    description: "Game full dive đầu tiên trên thế giới, một thanh niên bình thường trở thành chiến binh huyền thoại.",
+    description:
+      "Game full dive đầu tiên trên thế giới, một thanh niên bình thường trở thành chiến binh huyền thoại.",
     author: authors[8],
     genres: ["Võng Du", "Phiêu Lưu"],
     status: "completed",
@@ -175,7 +184,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Kinh Dị: Ngôi Nhà Trên Đồi",
-    description: "Một gia đình chuyển đến ngôi nhà cổ trên đồi, họ phát hiện ra những bí mật kinh hoàng ẩn giấu bên trong.",
+    description:
+      "Một gia đình chuyển đến ngôi nhà cổ trên đồi, họ phát hiện ra những bí mật kinh hoàng ẩn giấu bên trong.",
     author: authors[9],
     genres: ["Kinh Dị", "Khủng Bố"],
     status: "completed",
@@ -186,7 +196,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Cổ Đại: Vương Phi Tài Năng",
-    description: "Nữ chính xuyên không trở thành vương phi, dùng tài năng và trí tuệ chinh phục cổ đại.",
+    description:
+      "Nữ chính xuyên không trở thành vương phi, dùng tài năng và trí tuệ chinh phục cổ đại.",
     author: authors[2],
     genres: ["Cổ Đại", "Ngôn Tình"],
     status: "ongoing",
@@ -197,7 +208,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Dị Năng: Thế Giới Mới",
-    description: "Thảm họa zombie, con người thức tỉnh dị năng, chiến đấu để sinh tồn trong thế giới mới.",
+    description:
+      "Thảm họa zombie, con người thức tỉnh dị năng, chiến đấu để sinh tồn trong thế giới mới.",
     author: authors[3],
     genres: ["Dị Năng", "Phiêu Lưu"],
     status: "ongoing",
@@ -208,7 +220,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Ngược: Bạch Nguyệt Quang",
-    description: "Cô gái bị người yêu bỏ rơi, sau khi trở thành ngôi sao hàng đầu, anh ta hối hận không kịp.",
+    description:
+      "Cô gái bị người yêu bỏ rơi, sau khi trở thành ngôi sao hàng đầu, anh ta hối hận không kịp.",
     author: authors[4],
     genres: ["Ngược", "Đô Thị"],
     status: "completed",
@@ -219,7 +232,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Nữ Cường: Thần Y Phó Tổng",
-    description: "Nữ y sĩ tài năng kết hôn với tổng tài lạnh lùng, dùng y thuật và trí tuệ làm rung chuyển giới thượng lưu.",
+    description:
+      "Nữ y sĩ tài năng kết hôn với tổng tài lạnh lùng, dùng y thuật và trí tuệ làm rung chuyển giới thượng lưu.",
     author: authors[2],
     genres: ["Nữ Cường", "Đô Thị"],
     status: "ongoing",
@@ -230,7 +244,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Linh Dị: Thư Viện Bí Ẩn",
-    description: "Một thư viện cũ chứa những cuốn sách có thể đưa người đọc vào thế giới bên trong.",
+    description:
+      "Một thư viện cũ chứa những cuốn sách có thể đưa người đọc vào thế giới bên trong.",
     author: authors[5],
     genres: ["Linh Dị", "Kinh Dị"],
     status: "ongoing",
@@ -241,7 +256,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Hài Hước: Ta Là Chúa Tể F5",
-    description: "Một nhân viên văn phòng xuyên qua thế giới khác với khả năng F5 mọi thứ, biến thế giới huyền huyễn thành trò chơi.",
+    description:
+      "Một nhân viên văn phòng xuyên qua thế giới khác với khả năng F5 mọi thứ, biến thế giới huyền huyễn thành trò chơi.",
     author: authors[8],
     genres: ["Hài Hước", "Huyền Huyễn"],
     status: "ongoing",
@@ -252,7 +268,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Bách Hợp: Hoa Sen Trắng",
-    description: "Hai cô gái gặp nhau trong hoàn cảnh éo le, tình yêu giữa họ vượt qua mọi định kiến.",
+    description:
+      "Hai cô gái gặp nhau trong hoàn cảnh éo le, tình yêu giữa họ vượt qua mọi định kiến.",
     author: authors[2],
     genres: ["Bách Hợp", "Ngôn Tình"],
     status: "completed",
@@ -263,7 +280,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Đam Mỹ: Vụ Luật Tình Yêu",
-    description: "Một luật sư lạnh lùng phải bảo vệ thân chủ đẹp trai trong vụ án phức tạp, tình cảm dần nảy sinh.",
+    description:
+      "Một luật sư lạnh lùng phải bảo vệ thân chủ đẹp trai trong vụ án phức tạp, tình cảm dần nảy sinh.",
     author: authors[4],
     genres: ["Đam Mỹ", "Đô Thị"],
     status: "ongoing",
@@ -274,7 +292,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Xuyên Không: Hoàng Hậu Ma Pháp",
-    description: "Cô gái hiện đại xuyên vào thế giới ma pháp, trở thành hoàng hậu bị ruồng bỏ, dùng kiến thức hiện đại thay đổi cả đế quốc.",
+    description:
+      "Cô gái hiện đại xuyên vào thế giới ma pháp, trở thành hoàng hậu bị ruồng bỏ, dùng kiến thức hiện đại thay đổi cả đế quốc.",
     author: authors[7],
     genres: ["Xuyên Không", "Cổ Đại"],
     status: "completed",
@@ -285,7 +304,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Thế Giới Đảo Ngược: Người Cuối Cùng",
-    description: "Thế giới đảo ngược, người giàu nhất trở thành người nghèo nhất, chỉ có một người nhớ mọi thứ.",
+    description:
+      "Thế giới đảo ngược, người giàu nhất trở thành người nghèo nhất, chỉ có một người nhớ mọi thứ.",
     author: authors[6],
     genres: ["Thế Giới Đảo Ngược", "Khoa Huyễn"],
     status: "ongoing",
@@ -307,7 +327,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Quan Trường: Nhất Phẩm Cẩm Y",
-    description: "Một thiếu gia thời Minh trở thành quan thần, dùng tài năng và tham vọng leo lên đỉnh cao quyền lực.",
+    description:
+      "Một thiếu gia thời Minh trở thành quan thần, dùng tài năng và tham vọng leo lên đỉnh cao quyền lực.",
     author: authors[1],
     genres: ["Quan Trường", "Cổ Đại"],
     status: "ongoing",
@@ -318,7 +339,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Điền Văn: Mật Ong Đắng",
-    description: "Cô gái trẻ về nông thôn trồng hoa, cuộc sống bình yên xen lẫn những sóng gió tình cảm.",
+    description:
+      "Cô gái trẻ về nông thôn trồng hoa, cuộc sống bình yên xen lẫn những sóng gió tình cảm.",
     author: authors[7],
     genres: ["Điền Văn", "Tình Cảm"],
     status: "completed",
@@ -329,7 +351,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Truyện Tranh: One Piece Việt",
-    description: "Phiên bản Việt Nam của cuộc phiêu lưu trên biển, nhóm bạn trẻ tìm kho báu huyền thoại.",
+    description:
+      "Phiên bản Việt Nam của cuộc phiêu lưu trên biển, nhóm bạn trẻ tìm kho báu huyền thoại.",
     author: authors[8],
     genres: ["Truyện Tranh", "Phiêu Lưu"],
     status: "ongoing",
@@ -340,7 +363,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Ngôn Tình: Chief Secretary's Love",
-    description: "Thư ký tài năng và giám đốc đẹp trai, mối quan hệ công việc dần trở thành tình yêu.",
+    description:
+      "Thư ký tài năng và giám đốc đẹp trai, mối quan hệ công việc dần trở thành tình yêu.",
     author: authors[2],
     genres: ["Ngôn Tình", "Sủng"],
     status: "completed",
@@ -351,7 +375,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Kiếm Hiệp: Bất Tử Kiếm Thần",
-    description: "Một kiếm tu bất tử, sống qua hàng ngàn năm, chứng kiến sự thay đổi của nhân loại.",
+    description:
+      "Một kiếm tu bất tử, sống qua hàng ngàn năm, chứng kiến sự thay đổi của nhân loại.",
     author: authors[1],
     genres: ["Kiếm Hiệp", "Tiên Hiệp"],
     status: "ongoing",
@@ -362,7 +387,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Tiên Hiệp: Ngạo Thế Tiên Đồ",
-    description: "Thiếu niên bình thường được tiên nhân truyền thụ, từ đây bắt đầu hành trình tu tiên nghịch thiên.",
+    description:
+      "Thiếu niên bình thường được tiên nhân truyền thụ, từ đây bắt đầu hành trình tu tiên nghịch thiên.",
     author: authors[0],
     genres: ["Tiên Hiệp", "Phiêu Lưu"],
     status: "completed",
@@ -373,7 +399,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Hệ Thống: Siêu Cấp Thần Binh",
-    description: "Một thợ rèn nhận được hệ thống tạo ra vũ khí thần kỳ, mỗi vũ khí đều có sức mạnh đặc biệt.",
+    description:
+      "Một thợ rèn nhận được hệ thống tạo ra vũ khí thần kỳ, mỗi vũ khí đều có sức mạnh đặc biệt.",
     author: authors[6],
     genres: ["Hệ Thống", "Huyền Huyễn"],
     status: "ongoing",
@@ -384,7 +411,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Trọng Sinh: Bệ Hạ, Lại Bỏ Trốn Rồi",
-    description: "Hoàng đế trọng sinh, lần này quyết tâm làm chủ vận mệnh, nhưng hoàng hậu luôn tìm cách bỏ trốn.",
+    description:
+      "Hoàng đế trọng sinh, lần này quyết tâm làm chủ vận mệnh, nhưng hoàng hậu luôn tìm cách bỏ trốn.",
     author: authors[4],
     genres: ["Trọng Sinh", "Cổ Đại"],
     status: "completed",
@@ -395,7 +423,8 @@ const novelsData: NovelInput[] = [
   },
   {
     title: "Dị Năng: Siêu Nhiên Học Viện",
-    description: "Học viện dành cho người có dị năng, mỗi học sinh đều có khả năng đặc biệt, nhưng bí mật lớn đang chờ đợi.",
+    description:
+      "Học viện dành cho người có dị năng, mỗi học sinh đều có khả năng đặc biệt, nhưng bí mật lớn đang chờ đợi.",
     author: authors[3],
     genres: ["Dị Năng", "Khoa Huyễn"],
     status: "ongoing",
@@ -541,7 +570,11 @@ interface CommentInput {
 
 const commentsPerNovel: CommentInput[][] = [
   [
-    { userIndex: 0, content: "Truyện hay quá, đọc không ngừng được!", replies: [{ userIndex: 1, content: "Đúng vậy, mình cũng nghiện luôn" }] },
+    {
+      userIndex: 0,
+      content: "Truyện hay quá, đọc không ngừng được!",
+      replies: [{ userIndex: 1, content: "Đúng vậy, mình cũng nghiện luôn" }],
+    },
     { userIndex: 1, content: "Tác giả viết đỉnh thật sự" },
     { userIndex: 2, content: "Chờ chap mới hoài luôn á" },
   ],
@@ -766,7 +799,11 @@ async function seedGenres(db: admin.firestore.Firestore) {
 function randomDate(daysAgo: number): string {
   const date = new Date();
   date.setDate(date.getDate() - Math.floor(Math.random() * daysAgo));
-  date.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60), Math.floor(Math.random() * 60));
+  date.setHours(
+    Math.floor(Math.random() * 24),
+    Math.floor(Math.random() * 60),
+    Math.floor(Math.random() * 60),
+  );
   return date.toISOString();
 }
 
@@ -794,6 +831,7 @@ async function seedNovels(db: admin.firestore.Firestore): Promise<string[]> {
       genre: novel.genres,
       status: novel.status,
       chapter_count: 0,
+      public_chapter_count: 0,
       total_word_count: 0,
       rating: novel.rating,
       views: novel.views,
@@ -849,7 +887,11 @@ async function seedChapters(db: admin.firestore.Firestore, novelIds: string[]) {
       const content = generateChapterContent(novelTitle, ch, wordCount);
       const createdAt = randomDate(120);
 
-      const chapterRef = db.collection("novels").doc(novelId).collection("chapters").doc(String(ch));
+      const chapterRef = db
+        .collection("novels")
+        .doc(novelId)
+        .collection("chapters")
+        .doc(String(ch));
       batch.set(chapterRef, {
         index: ch,
         title: `Chương ${ch}`,
@@ -857,6 +899,8 @@ async function seedChapters(db: admin.firestore.Firestore, novelIds: string[]) {
         word_count: wordCount,
         access_type: accessType,
         price: accessType === "paid" ? 5000 + Math.floor(Math.random() * 10000) : 0,
+        publication_status: "public",
+        public_at: createdAt,
         created_at: createdAt,
         updated_at: createdAt,
       });
@@ -868,6 +912,7 @@ async function seedChapters(db: admin.firestore.Firestore, novelIds: string[]) {
     const novelRef = db.collection("novels").doc(novelId);
     batch.update(novelRef, {
       chapter_count: chapterCount,
+      public_chapter_count: chapterCount,
       total_word_count: totalWordCount,
     });
 
@@ -930,7 +975,11 @@ async function seedReadingHistory(db: admin.firestore.Firestore, novelIds: strin
       const novelId = novelIds[entry.novelIndex];
       if (!novelId) continue;
 
-      const docRef = db.collection("users").doc(user.uid).collection("reading_history").doc(novelId);
+      const docRef = db
+        .collection("users")
+        .doc(user.uid)
+        .collection("reading_history")
+        .doc(novelId);
       await docRef.set({
         novel_id: novelId,
         last_chapter_index: entry.chapters[entry.chapters.length - 1],
@@ -1017,7 +1066,12 @@ async function seedComments(db: admin.firestore.Firestore, novelIds: string[]) {
   console.log("  Updating novel comment counts...");
   for (let i = 0; i < novelIds.length; i++) {
     const novelId = novelIds[i];
-    const snapshot = await db.collection("novels").doc(novelId).collection("comments").count().get();
+    const snapshot = await db
+      .collection("novels")
+      .doc(novelId)
+      .collection("comments")
+      .count()
+      .get();
     const commentCount = snapshot.data().count;
     await db.collection("novels").doc(novelId).update({ comment_count: commentCount });
   }

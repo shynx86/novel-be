@@ -217,6 +217,22 @@ describe("GET /api/novels/:novelId/chapters", () => {
 // ─── GET /api/novels/:novelId/chapters/:index ───────────────────────────
 
 describe("GET /api/novels/:novelId/chapters/:index", () => {
+  it("returns 404 for a chapter that is still scheduled", async () => {
+    const scheduledChapter = {
+      ...mockPaidChapterWithContent,
+      access_type: "free",
+      publication_status: "scheduled",
+      public_at: "2099-01-01T00:00:00.000Z",
+    };
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => mockNovelDoc })
+      .mockResolvedValueOnce({ exists: true, data: () => scheduledChapter });
+
+    const res = await app.request("/api/novels/novel-1/chapters/3");
+
+    expect(res.status).toBe(404);
+  });
+
   it("returns 200 for free chapter without auth", async () => {
     const freeChapter = { ...mockPaidChapterWithContent, access_type: "free", price: 0 };
     mockDocGet

@@ -17,6 +17,7 @@
     "seed:genres": "tsx scripts/seed-genres.ts",
     "seed:all": "tsx scripts/seed-all.ts",
     "migrate:chapter-access-type": "tsx scripts/migrate-chapter-access-type.ts",
+    "migrate:chapter-publication": "tsx scripts/migrate-chapter-publication.ts",
     "migrate:novel-list-fields": "tsx scripts/backfill-novel-list-fields.ts",
     "migrate:slug-document-ids": "node --env-file=.env --import tsx/esm scripts/migrate-slug-document-ids.ts",
     "typecheck": "tsc --noEmit"

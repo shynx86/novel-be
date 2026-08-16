@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
-import { getChapter, listChapters, listNewestChapters } from "../services/chapter.js";
+import { getPublicChapter, listChapters, listNewestChapters } from "../services/chapter.js";
 import { getFirestore } from "../services/firebase.js";
 import {
   enrichNovelWithRelations,
@@ -138,7 +138,12 @@ novels.get("/:novelId/chapters", optionalAuthMiddleware, async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);
 
   await getPublicNovel(novelId);
-  const result = await listChapters(novelId, { page, limit, includeContent: false });
+  const result = await listChapters(novelId, {
+    page,
+    limit,
+    includeContent: false,
+    publicOnly: true,
+  });
 
   // If user is authenticated, annotate with subscription status
   const userId = c.get("userId") as string | undefined;
@@ -168,7 +173,7 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
   const userId = c.get("userId") as string | undefined;
 
   await getPublicNovel(novelId);
-  const chapter = await getChapter(novelId, index);
+  const chapter = await getPublicChapter(novelId, index);
 
   switch (chapter.access_type) {
     case "free":

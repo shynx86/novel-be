@@ -7,7 +7,7 @@ import {
   ValidationError,
 } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
-import { getChapter } from "./chapter.js";
+import { getPublicChapter } from "./chapter.js";
 import { getFirestore } from "./firebase.js";
 import { getPublicNovel } from "./novel.js";
 
@@ -84,7 +84,7 @@ export async function subscribeChapter(
   await getPublicNovel(novelId);
 
   // Validate chapter exists and is paid
-  const chapter = await getChapter(novelId, chapterIndex);
+  const chapter = await getPublicChapter(novelId, chapterIndex);
   if (chapter.access_type !== "paid") {
     throw new ValidationError("This chapter is not available for subscription");
   }
@@ -297,7 +297,7 @@ export async function checkAccess(
   price?: number;
   novel_price?: number | null;
 }> {
-  const chapter = await getChapter(novelId, chapterIndex);
+  const chapter = await getPublicChapter(novelId, chapterIndex);
   const novel = await getPublicNovel(novelId);
 
   if (chapter.access_type === "free") {

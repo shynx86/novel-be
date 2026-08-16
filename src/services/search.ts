@@ -11,6 +11,7 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     cover_url: data.cover_url,
     status: data.status,
     chapter_count: data.chapter_count || 0,
+    public_chapter_count: data.public_chapter_count ?? data.chapter_count ?? 0,
     total_word_count: data.total_word_count || 0,
     rating: data.rating ?? 0,
     views: data.views ?? 0,
