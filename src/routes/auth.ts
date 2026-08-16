@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware } from "../middleware/authorization.js";
 import { rateLimit } from "../middleware/rate-limit.js";
 import {
   getUserProfile,
@@ -9,11 +10,13 @@ import {
   registerWithEmail,
   updateUserProfile,
 } from "../services/auth.js";
+import type { Actor } from "../types/auth.js";
 import { ValidationError } from "../utils/errors.js";
 
 type Variables = {
   user: unknown;
   userId: string;
+  actor: Actor;
 };
 
 const auth = new Hono<{ Variables: Variables }>();
@@ -109,6 +112,20 @@ auth.patch("/me", authMiddleware, async (c) => {
 
   const user = await updateUserProfile(userId, body);
   return c.json({ data: user }, 200);
+});
+
+// GET /api/auth/capabilities (protected)
+auth.get("/capabilities", authMiddleware, loadActorMiddleware, (c) => {
+  const actor = c.get("actor");
+  return c.json(
+    {
+      data: {
+        role: actor.role,
+        permissions: Array.from(actor.permissions),
+      },
+    },
+    200,
+  );
 });
 
 export { auth };

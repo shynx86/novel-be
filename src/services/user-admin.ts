@@ -3,6 +3,7 @@ import type { PaginatedResult, UserDocument } from "../types/novel.js";
 import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
+import { getRole } from "./role.js";
 
 function userDocToData(uid: string, data: admin.firestore.DocumentData): UserDocument {
   return {
@@ -65,12 +66,8 @@ export async function updateUser(
   const doc = await db.collection("users").doc(uid).get();
   if (!doc.exists) throw new NotFoundError("User not found");
 
-  // Validate role
   if (input.role !== undefined) {
-    const validRoles = ["user", "admin", "translator"];
-    if (!validRoles.includes(input.role)) {
-      throw new Error(`Invalid role. Must be one of: ${validRoles.join(", ")}`);
-    }
+    await getRole(input.role);
   }
 
   const now = new Date().toISOString();

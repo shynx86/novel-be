@@ -1,13 +1,13 @@
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware, requirePermission } from "../middleware/authorization.js";
 import { createAd, deleteAd, getAd, listAds, updateAd } from "../services/ad.js";
 import { ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 
 const adminAds = new Hono();
 
-adminAds.use("/*", authMiddleware, adminMiddleware);
+adminAds.use("/*", authMiddleware, loadActorMiddleware, requirePermission("ads.manage"));
 
 adminAds.get("/", async (c) => {
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 20);

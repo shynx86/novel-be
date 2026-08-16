@@ -18,11 +18,9 @@ export const authMiddleware: MiddlewareHandler = async (c: Context, next) => {
 
   const token = authHeader.slice(7);
 
+  let decodedToken: admin.auth.DecodedIdToken;
   try {
-    const decodedToken = await verifyToken(token);
-    c.set("user", decodedToken);
-    c.set("userId", decodedToken.uid);
-    await next();
+    decodedToken = await verifyToken(token);
   } catch (err) {
     logger.warn("Auth verification failed", {
       error: err instanceof Error ? err.message : String(err),
@@ -30,4 +28,8 @@ export const authMiddleware: MiddlewareHandler = async (c: Context, next) => {
     });
     throw new UnauthorizedError("Invalid or expired token");
   }
+
+  c.set("user", decodedToken);
+  c.set("userId", decodedToken.uid);
+  await next();
 };

@@ -1,6 +1,13 @@
 import { Hono } from "hono";
+import type { Permission } from "../config/permissions.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { translatorMiddleware } from "../middleware/translator.js";
+import {
+  actorHasPermission,
+  assertAnyPermission,
+  assertOwnedPermission,
+  loadActorMiddleware,
+  requirePermission,
+} from "../middleware/authorization.js";
 import {
   createChapter,
   deleteChapter,
@@ -17,6 +24,7 @@ import {
   listNovels,
   updateNovel,
 } from "../services/novel.js";
+import type { Actor } from "../types/auth.js";
 import { ForbiddenError, ValidationError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 import { assertImmutableSlug } from "../utils/slug.js";
@@ -24,21 +32,28 @@ import { assertImmutableSlug } from "../utils/slug.js";
 type Variables = {
   user: unknown;
   userId: string;
-  isAdmin: boolean;
-  isTranslator: boolean;
-  userRole: string;
+  actor: Actor;
 };
 
 const adminNovels = new Hono<{ Variables: Variables }>();
 
-adminNovels.use("/*", authMiddleware, translatorMiddleware);
+adminNovels.use("/*", authMiddleware, loadActorMiddleware, requirePermission("admin.access"));
+
+async function assertNovelScope(
+  actor: Actor,
+  novelId: string,
+  ownPermission: Permission,
+  anyPermission: Permission,
+): Promise<void> {
+  if (actorHasPermission(actor, anyPermission)) return;
+  const novel = await getNovel(novelId);
+  assertOwnedPermission(actor, novel.translator_id, ownPermission, anyPermission);
+}
 
 // POST /api/admin/novels
-adminNovels.post("/", async (c) => {
+adminNovels.post("/", requirePermission("novels.create"), async (c) => {
   const body = await c.req.json();
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-  const isTranslator = userRole === "translator";
+  const actor = c.get("actor");
 
   if (!body.title || typeof body.title !== "string") {
     throw new ValidationError("title is required", { field: "title" });
@@ -47,7 +62,6 @@ adminNovels.post("/", async (c) => {
     throw new ValidationError("slug must be a string", { field: "slug" });
   }
   if (
-    userRole === "admin" &&
     body.publication_status !== undefined &&
     body.publication_status !== "draft" &&
     body.publication_status !== "public"
@@ -57,8 +71,12 @@ adminNovels.post("/", async (c) => {
     });
   }
 
-  // Translator automatically becomes the translator of the novel
-  const translatorId = isTranslator ? userId : body.translator_id;
+  if (body.publication_status !== undefined && !actorHasPermission(actor, "novels.publish")) {
+    throw new ForbiddenError("Permission required", { permission: "novels.publish" });
+  }
+
+  const canAssignTranslator = actorHasPermission(actor, "novels.assign_translator");
+  const translatorId = canAssignTranslator ? body.translator_id : actor.userId;
 
   const novel = await createNovel({
     slug: body.slug || body.title,
@@ -66,7 +84,9 @@ adminNovels.post("/", async (c) => {
     description: body.description,
     cover_url: body.cover_url,
     status: body.status,
-    publication_status: userRole === "admin" ? body.publication_status : undefined,
+    publication_status: actorHasPermission(actor, "novels.publish")
+      ? body.publication_status
+      : undefined,
     price: body.price,
     translator_id: translatorId,
   });
@@ -96,11 +116,10 @@ adminNovels.get("/", async (c) => {
     | "rating"
     | undefined;
   const sortOrder = c.req.query("sort_order") as "asc" | "desc" | undefined;
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
+  const actor = c.get("actor");
+  assertAnyPermission(actor, ["novels.view.own", "novels.view.any"]);
 
-  // Translator only sees their own novels
-  const translatorId = userRole === "translator" ? userId : undefined;
+  const translatorId = actorHasPermission(actor, "novels.view.any") ? undefined : actor.userId;
 
   const result = await listNovels({
     page,
@@ -118,15 +137,10 @@ adminNovels.get("/", async (c) => {
 // GET /api/admin/novels/:novelId
 adminNovels.get("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
+  const actor = c.get("actor");
 
   const novel = await getNovel(novelId);
-
-  // Translator can only access their own novels
-  if (userRole === "translator" && novel.translator_id !== userId) {
-    throw new ForbiddenError("You can only access your own novels");
-  }
+  assertOwnedPermission(actor, novel.translator_id, "novels.view.own", "novels.view.any");
 
   const enriched = await enrichNovelWithRelations(novel);
   return c.json({ data: enriched }, 200);
@@ -136,8 +150,7 @@ adminNovels.get("/:novelId", async (c) => {
 adminNovels.patch("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
   const body = await c.req.json();
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
+  const actor = c.get("actor");
 
   if (body.slug !== undefined) {
     if (typeof body.slug !== "string") {
@@ -146,8 +159,9 @@ adminNovels.patch("/:novelId", async (c) => {
     assertImmutableSlug(novelId, body.slug);
   }
 
+  await assertNovelScope(actor, novelId, "novels.update.own", "novels.update.any");
+
   if (
-    userRole === "admin" &&
     body.publication_status !== undefined &&
     body.publication_status !== "draft" &&
     body.publication_status !== "public"
@@ -157,12 +171,13 @@ adminNovels.patch("/:novelId", async (c) => {
     });
   }
 
-  // Check access for translator
-  if (userRole === "translator") {
-    const existingNovel = await getNovel(novelId);
-    if (existingNovel.translator_id !== userId) {
-      throw new ForbiddenError("You can only edit your own novels");
-    }
+  if (body.publication_status !== undefined && !actorHasPermission(actor, "novels.publish")) {
+    throw new ForbiddenError("Permission required", { permission: "novels.publish" });
+  }
+  if (body.translator_id !== undefined && !actorHasPermission(actor, "novels.assign_translator")) {
+    throw new ForbiddenError("Permission required", {
+      permission: "novels.assign_translator",
+    });
   }
 
   const updateData: Record<string, unknown> = {
@@ -171,14 +186,13 @@ adminNovels.patch("/:novelId", async (c) => {
     cover_url: body.cover_url,
     status: body.status,
     // Publication is an admin-only decision; translators can prepare drafts.
-    ...(userRole === "admin" && body.publication_status !== undefined
+    ...(actorHasPermission(actor, "novels.publish") && body.publication_status !== undefined
       ? { publication_status: body.publication_status }
       : {}),
     price: body.price,
   };
 
-  // Admin can update translator_id
-  if (userRole === "admin" && body.translator_id !== undefined) {
+  if (actorHasPermission(actor, "novels.assign_translator") && body.translator_id !== undefined) {
     updateData.translator_id = body.translator_id || null;
   }
 
@@ -198,31 +212,17 @@ adminNovels.patch("/:novelId", async (c) => {
 // DELETE /api/admin/novels/:novelId
 adminNovels.delete("/:novelId", async (c) => {
   const novelId = c.req.param("novelId");
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-
-  // Check access for translator
-  if (userRole === "translator") {
-    const existingNovel = await getNovel(novelId);
-    if (existingNovel.translator_id !== userId) {
-      throw new ForbiddenError("You can only delete your own novels");
-    }
-  }
+  const actor = c.get("actor");
+  await assertNovelScope(actor, novelId, "novels.delete.own", "novels.delete.any");
 
   await deleteNovel(novelId);
   return c.json({ data: { deleted: true } }, 200);
 });
 
 // PATCH /api/admin/novels/:novelId/featured
-adminNovels.patch("/:novelId/featured", async (c) => {
+adminNovels.patch("/:novelId/featured", requirePermission("novels.feature"), async (c) => {
   const novelId = c.req.param("novelId");
   const body = await c.req.json();
-  const userRole = c.get("userRole") as string;
-
-  // Only admin can toggle featured
-  if (userRole !== "admin") {
-    throw new ForbiddenError("Only admins can toggle featured status");
-  }
 
   if (typeof body.is_featured !== "boolean") {
     throw new ValidationError("is_featured must be a boolean", { field: "is_featured" });
@@ -238,16 +238,8 @@ adminNovels.patch("/:novelId/featured", async (c) => {
 adminNovels.post("/:novelId/chapters", async (c) => {
   const novelId = c.req.param("novelId");
   const body = await c.req.json();
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-
-  // Check access for translator
-  if (userRole === "translator") {
-    const novel = await getNovel(novelId);
-    if (novel.translator_id !== userId) {
-      throw new ForbiddenError("You can only add chapters to your own novels");
-    }
-  }
+  const actor = c.get("actor");
+  await assertNovelScope(actor, novelId, "chapters.manage.own", "chapters.manage.any");
 
   if (!body.title || typeof body.title !== "string") {
     throw new ValidationError("title is required", { field: "title" });
@@ -275,16 +267,8 @@ adminNovels.post("/:novelId/chapters", async (c) => {
 adminNovels.get("/:novelId/chapters", async (c) => {
   const novelId = c.req.param("novelId");
   const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 100);
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-
-  // Check access for translator
-  if (userRole === "translator") {
-    const novel = await getNovel(novelId);
-    if (novel.translator_id !== userId) {
-      throw new ForbiddenError("You can only view chapters of your own novels");
-    }
-  }
+  const actor = c.get("actor");
+  await assertNovelScope(actor, novelId, "chapters.manage.own", "chapters.manage.any");
 
   const result = await listChapters(novelId, {
     page,
@@ -298,16 +282,8 @@ adminNovels.get("/:novelId/chapters", async (c) => {
 adminNovels.get("/:novelId/chapters/:index", async (c) => {
   const novelId = c.req.param("novelId");
   const index = Number(c.req.param("index"));
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-
-  // Check access for translator
-  if (userRole === "translator") {
-    const novel = await getNovel(novelId);
-    if (novel.translator_id !== userId) {
-      throw new ForbiddenError("You can only view chapters of your own novels");
-    }
-  }
+  const actor = c.get("actor");
+  await assertNovelScope(actor, novelId, "chapters.manage.own", "chapters.manage.any");
 
   const chapter = await getChapter(novelId, index);
   return c.json({ data: chapter }, 200);
@@ -318,16 +294,8 @@ adminNovels.patch("/:novelId/chapters/:index", async (c) => {
   const novelId = c.req.param("novelId");
   const index = Number(c.req.param("index"));
   const body = await c.req.json();
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-
-  // Check access for translator
-  if (userRole === "translator") {
-    const novel = await getNovel(novelId);
-    if (novel.translator_id !== userId) {
-      throw new ForbiddenError("You can only edit chapters of your own novels");
-    }
-  }
+  const actor = c.get("actor");
+  await assertNovelScope(actor, novelId, "chapters.manage.own", "chapters.manage.any");
 
   if (body.access_type !== undefined && !["free", "free_auth", "paid"].includes(body.access_type)) {
     throw new ValidationError("access_type must be one of: free, free_auth, paid", {
@@ -349,16 +317,8 @@ adminNovels.patch("/:novelId/chapters/:index", async (c) => {
 adminNovels.delete("/:novelId/chapters/:index", async (c) => {
   const novelId = c.req.param("novelId");
   const index = Number(c.req.param("index"));
-  const userId = c.get("userId") as string;
-  const userRole = c.get("userRole") as string;
-
-  // Check access for translator
-  if (userRole === "translator") {
-    const novel = await getNovel(novelId);
-    if (novel.translator_id !== userId) {
-      throw new ForbiddenError("You can only delete chapters of your own novels");
-    }
-  }
+  const actor = c.get("actor");
+  await assertNovelScope(actor, novelId, "chapters.manage.own", "chapters.manage.any");
 
   await deleteChapter(novelId, index);
   return c.json({ data: { deleted: true } }, 200);

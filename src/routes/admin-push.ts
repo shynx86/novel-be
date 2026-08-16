@@ -1,18 +1,17 @@
 import { Hono } from "hono";
-import { adminMiddleware } from "../middleware/admin.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { loadActorMiddleware, requirePermission } from "../middleware/authorization.js";
 import { upsertNovelChapters, upsertNovelMeta } from "../services/push.js";
 import { ValidationError } from "../utils/errors.js";
 
 type Variables = {
   user: unknown;
   userId: string;
-  isAdmin: boolean;
 };
 
 const adminPush = new Hono<{ Variables: Variables }>();
 
-adminPush.use("/*", authMiddleware, adminMiddleware);
+adminPush.use("/*", authMiddleware, loadActorMiddleware, requirePermission("data.push"));
 
 // POST /api/admin/push/novel-meta
 adminPush.post("/novel-meta", async (c) => {

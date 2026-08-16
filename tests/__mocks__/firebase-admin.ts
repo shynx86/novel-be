@@ -19,6 +19,18 @@ export const mockDocUpdate: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockDocDelete: any = jest.fn();
 
+// Role documents use dedicated mocks so authorization reads do not consume
+// service-level document responses in existing route tests.
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockRoleDocGet: any = jest.fn(async () => ({
+  exists: false,
+  data: () => undefined,
+}));
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockRoleDocSet: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockRoleDocDelete: any = jest.fn();
+
 // Collection-level mocks
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockCollectionAdd: any = jest.fn();
@@ -86,22 +98,22 @@ function createQueryBuilder() {
 }
 
 // Create a doc reference mock
-function createDocRef(id?: string) {
+function createDocRef(id?: string, collectionName?: string) {
   return {
     id,
-    get: mockDocGet,
-    set: mockDocSet,
+    get: collectionName === "roles" ? mockRoleDocGet : mockDocGet,
+    set: collectionName === "roles" ? mockRoleDocSet : mockDocSet,
     update: mockDocUpdate,
-    delete: mockDocDelete,
+    delete: collectionName === "roles" ? mockRoleDocDelete : mockDocDelete,
     collection: jest.fn(() => createCollectionRef()),
   };
 }
 
 // Create a collection reference mock with query builder support
-function createCollectionRef() {
+function createCollectionRef(collectionName?: string) {
   const builder = createQueryBuilder();
   return {
-    doc: jest.fn((id?: string) => createDocRef(id)),
+    doc: jest.fn((id?: string) => createDocRef(id, collectionName)),
     add: mockCollectionAdd,
     where: builder.where,
     orderBy: builder.orderBy,
@@ -125,7 +137,7 @@ const mockApp = {
     createCustomToken: mockCreateCustomToken,
   }),
   firestore: () => ({
-    collection: jest.fn(() => createCollectionRef()),
+    collection: jest.fn((name: string) => createCollectionRef(name)),
     collectionGroup: mockCollectionGroup,
     listCollections: jest.fn(),
     runTransaction: mockRunTransaction,
@@ -140,7 +152,7 @@ const mockApp = {
 
 // firestore is both callable and has FieldValue property
 const firestoreFn = jest.fn(() => ({
-  collection: jest.fn(() => createCollectionRef()),
+  collection: jest.fn((name: string) => createCollectionRef(name)),
   collectionGroup: mockCollectionGroup,
   listCollections: jest.fn(),
   runTransaction: mockRunTransaction,
