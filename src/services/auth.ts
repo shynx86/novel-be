@@ -1,6 +1,12 @@
 import type admin from "firebase-admin";
 import { env } from "../config/env.js";
-import { AppError, NotFoundError, UnauthorizedError, ValidationError } from "../utils/errors.js";
+import {
+  AppError,
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getAuth, getFirestore } from "./firebase.js";
 
@@ -9,6 +15,9 @@ export interface UserDocument {
   email: string;
   display_name: string;
   avatar_url: string;
+  username: string;
+  username_lowercase: string;
+  bio: string;
   credits: number;
   role: string;
   created_at: string;
@@ -43,10 +52,30 @@ function buildUserDoc(
     email: data.email,
     display_name: data.display_name || `user_${uid}`,
     avatar_url: data.avatar_url || "",
+    username: `user_${uid}`,
+    username_lowercase: `user_${uid}`.toLowerCase(),
+    bio: "",
     credits: 0,
     role: "user",
     created_at: now,
     updated_at: now,
+  };
+}
+
+function normalizeUserDoc(uid: string, data: Partial<UserDocument>): UserDocument {
+  const username = data.username || `user_${uid}`;
+  return {
+    uid,
+    email: data.email || "",
+    display_name: data.display_name || username,
+    avatar_url: data.avatar_url || "",
+    username,
+    username_lowercase: data.username_lowercase || username.toLowerCase(),
+    bio: data.bio || "",
+    credits: data.credits ?? 0,
+    role: data.role || "user",
+    created_at: data.created_at || new Date(0).toISOString(),
+    updated_at: data.updated_at || new Date(0).toISOString(),
   };
 }
 
@@ -61,7 +90,7 @@ async function getUserDocument(uid: string): Promise<UserDocument | null> {
   const db = getFirestore();
   const doc = await db.collection("users").doc(uid).get();
   if (!doc.exists) return null;
-  return doc.data() as UserDocument;
+  return normalizeUserDoc(uid, doc.data() as Partial<UserDocument>);
 }
 
 async function getOrCreateUserDocument(uid: string, data: CreateUserData): Promise<UserDocument> {
@@ -307,16 +336,77 @@ export async function getUserProfile(uid: string): Promise<UserDocument> {
 
 export async function updateUserProfile(
   uid: string,
-  input: { display_name?: string; avatar_url?: string },
+  input: { display_name?: string; avatar_url?: string; username?: string; bio?: string },
 ): Promise<UserDocument> {
   const db = getFirestore();
   const now = new Date().toISOString();
+  const current = await getUserDocument(uid);
+  if (!current) throw new NotFoundError("User not found");
 
   const updates: Record<string, unknown> = { updated_at: now };
-  if (input.display_name !== undefined) updates.display_name = input.display_name;
-  if (input.avatar_url !== undefined) updates.avatar_url = input.avatar_url;
+  if (input.display_name !== undefined) {
+    const displayName = input.display_name.trim();
+    if (displayName.length < 2 || displayName.length > 50) {
+      throw new ValidationError("Tên hiển thị phải có từ 2 đến 50 ký tự", {
+        field: "display_name",
+      });
+    }
+    updates.display_name = displayName;
+  }
+  if (input.avatar_url !== undefined) {
+    const avatarUrl = input.avatar_url.trim();
+    if (avatarUrl && !/^https:\/\//i.test(avatarUrl)) {
+      throw new ValidationError("Ảnh đại diện phải là một URL HTTPS hợp lệ", {
+        field: "avatar_url",
+      });
+    }
+    updates.avatar_url = avatarUrl;
+  }
+  if (input.bio !== undefined) {
+    const bio = input.bio.trim();
+    if (bio.length > 500) {
+      throw new ValidationError("Giới thiệu không được vượt quá 500 ký tự", { field: "bio" });
+    }
+    updates.bio = bio;
+  }
+  if (input.username !== undefined) {
+    const username = input.username.trim().toLowerCase();
+    const reserved = new Set(["admin", "api", "ho-so", "bao-mat", "chinh-sua", "tai-khoan"]);
+    if (username !== current.username_lowercase) {
+      if (!/^[a-z0-9][a-z0-9_-]{2,29}$/.test(username) || reserved.has(username)) {
+        throw new ValidationError(
+          "Username phải có 3–30 ký tự, chỉ gồm chữ thường, số, dấu gạch ngang hoặc gạch dưới",
+          { field: "username" },
+        );
+      }
+      const duplicate = await db
+        .collection("users")
+        .where("username_lowercase", "==", username)
+        .limit(1)
+        .get();
+      if (!duplicate.empty && duplicate.docs[0]?.id !== uid) {
+        throw new ConflictError("Username đã được sử dụng", { field: "username" });
+      }
+    }
+    updates.username = username;
+    updates.username_lowercase = username;
+  }
 
   await db.collection("users").doc(uid).update(updates);
+  const authUpdates: { displayName?: string; photoURL?: string } = {};
+  if (typeof updates.display_name === "string") authUpdates.displayName = updates.display_name;
+  if (typeof updates.avatar_url === "string")
+    authUpdates.photoURL = updates.avatar_url || undefined;
+  if (Object.keys(authUpdates).length > 0) {
+    try {
+      await getAuth().updateUser(uid, authUpdates);
+    } catch (error) {
+      logger.warn("Firebase Auth profile sync failed", {
+        uid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
   logger.info("User profile updated", { uid });
 
   const user = await getUserDocument(uid);
@@ -324,4 +414,39 @@ export async function updateUserProfile(
     throw new NotFoundError("User not found");
   }
   return user;
+}
+
+export async function changePassword(
+  uid: string,
+  email: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  if (!env.firebaseApiKey) {
+    throw new AppError(500, "Authentication service not configured", "AUTH_SERVICE_ERROR");
+  }
+  if (newPassword.length < 8) {
+    throw new ValidationError("Mật khẩu mới phải có ít nhất 8 ký tự", {
+      field: "new_password",
+    });
+  }
+
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${env.firebaseApiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: currentPassword, returnSecureToken: false }),
+    },
+  );
+  if (!response.ok) throw new UnauthorizedError("Mật khẩu hiện tại không chính xác");
+
+  await getAuth().updateUser(uid, { password: newPassword });
+  await getAuth().revokeRefreshTokens(uid);
+  logger.info("User password changed", { uid });
+}
+
+export async function revokeUserSessions(uid: string): Promise<void> {
+  await getAuth().revokeRefreshTokens(uid);
+  logger.info("User sessions revoked", { uid });
 }

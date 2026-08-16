@@ -19,6 +19,7 @@ import { history } from "./history.js";
 import { novels } from "./novels.js";
 import { search } from "./search.js";
 import { subscriptions } from "./subscriptions.js";
+import { users } from "./users.js";
 
 export function registerRoutes(app: Hono): void {
   app.route("/api/health", health);
@@ -30,6 +31,7 @@ export function registerRoutes(app: Hono): void {
   app.route("/api/history", history);
   app.route("/api/subscriptions", subscriptions);
   app.route("/api/credits", credits);
+  app.route("/api/users", users);
 
   // Admin routes (Firebase auth + admin role)
   app.route("/api/admin/auth", adminAuth);

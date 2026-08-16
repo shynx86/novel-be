@@ -74,6 +74,16 @@ export async function removeFromHistory(userId: string, novelId: string): Promis
   logger.info("Reading history removed", { userId, novelId });
 }
 
+export async function clearReadingHistory(userId: string): Promise<void> {
+  const db = getFirestore();
+  const snapshot = await db.collection("users").doc(userId).collection("reading_history").get();
+  if (snapshot.empty) return;
+  const batch = db.batch();
+  for (const doc of snapshot.docs) batch.delete(doc.ref);
+  await batch.commit();
+  logger.info("Reading history cleared", { userId, count: snapshot.size });
+}
+
 export async function listReadingHistory(
   userId: string,
   params: { page?: number; limit?: number } = {},
