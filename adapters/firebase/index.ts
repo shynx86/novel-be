@@ -2,9 +2,11 @@ import type { Request, Response } from "express";
 import { onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2/options";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onTaskDispatched } from "firebase-functions/v2/tasks";
 
 setGlobalOptions({ region: "asia-southeast1" });
 import { app } from "../../src/app.js";
+import { processBetaChapterTask } from "../../src/services/beta-worker.js";
 import { publishDueChapters } from "../../src/services/chapter-publication.js";
 
 const handler = async (req: Request, res: Response) => {
@@ -56,5 +58,24 @@ export const publishScheduledChapters = onSchedule(
   },
   async () => {
     await publishDueChapters();
+  },
+);
+
+export const processBetaChapter = onTaskDispatched(
+  {
+    retryConfig: {
+      maxAttempts: 5,
+      minBackoffSeconds: 10,
+      maxBackoffSeconds: 300,
+    },
+    rateLimits: {
+      maxConcurrentDispatches: 3,
+      maxDispatchesPerSecond: 1,
+    },
+    timeoutSeconds: 180,
+  },
+  async (request) => {
+    const payload = request.data as { novelId: string; runId: string; chapterIndex: number };
+    await processBetaChapterTask(payload);
   },
 );

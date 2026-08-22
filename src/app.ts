@@ -4,7 +4,13 @@ import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { requestLogger } from "./middleware/request-logger.js";
 import { registerRoutes } from "./routes/index.js";
-import { AppError, ForbiddenError, PaymentRequiredError, ValidationError } from "./utils/errors.js";
+import {
+  AppError,
+  ConflictError,
+  ForbiddenError,
+  PaymentRequiredError,
+  ValidationError,
+} from "./utils/errors.js";
 import { logger } from "./utils/logger.js";
 
 const app = new Hono();
@@ -63,6 +69,7 @@ app.onError((err, c) => {
           code: err.code,
           message: err.message,
           ...((err instanceof ValidationError ||
+            err instanceof ConflictError ||
             err instanceof PaymentRequiredError ||
             err instanceof ForbiddenError) && {
             details: err.details,

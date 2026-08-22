@@ -2,8 +2,10 @@ import type { Hono } from "hono";
 import { adminAds } from "./admin-ads.js";
 import { adminAuth } from "./admin-auth.js";
 import { adminAuthors } from "./admin-authors.js";
+import { adminBeta } from "./admin-beta.js";
 import { adminCredits } from "./admin-credits.js";
 import { adminGenres } from "./admin-genres.js";
+import { adminNovelBeta } from "./admin-novel-beta.js";
 import { adminNovels } from "./admin-novels.js";
 import { adminPush } from "./admin-push.js";
 import { adminRoles } from "./admin-roles.js";
@@ -35,7 +37,9 @@ export function registerRoutes(app: Hono): void {
 
   // Admin routes (Firebase auth + admin role)
   app.route("/api/admin/auth", adminAuth);
+  app.route("/api/admin/beta", adminBeta);
   app.route("/api/admin/novels", adminNovels);
+  app.route("/api/admin/novels", adminNovelBeta);
   app.route("/api/admin/push", adminPush);
   app.route("/api/admin/roles", adminRoles);
   app.route("/api/admin/credits", adminCredits);

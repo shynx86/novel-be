@@ -59,6 +59,8 @@ export const mockBatchDelete: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockBatchSet: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockBatchUpdate: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockBatchCommit: any = jest.fn();
 
 // getAll mock (for batch fetching multiple documents)
@@ -68,6 +70,7 @@ export const mockGetAll: any = jest.fn();
 // FieldValue sentinel mock
 const FieldValue = {
   increment: jest.fn((n: number) => ({ _increment: n })),
+  delete: jest.fn(() => ({ _delete: true })),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: mock module
@@ -105,6 +108,7 @@ function createDocRef(id?: string, collectionName?: string) {
     set: collectionName === "roles" ? mockRoleDocSet : mockDocSet,
     update: mockDocUpdate,
     delete: collectionName === "roles" ? mockRoleDocDelete : mockDocDelete,
+    recursiveDelete: jest.fn(),
     collection: jest.fn(() => createCollectionRef()),
   };
 }
@@ -145,6 +149,7 @@ const mockApp = {
     batch: jest.fn(() => ({
       delete: mockBatchDelete,
       set: mockBatchSet,
+      update: mockBatchUpdate,
       commit: mockBatchCommit,
     })),
   }),
@@ -160,6 +165,7 @@ const firestoreFn = jest.fn(() => ({
   batch: jest.fn(() => ({
     delete: mockBatchDelete,
     set: mockBatchSet,
+    update: mockBatchUpdate,
     commit: mockBatchCommit,
   })),
 }));

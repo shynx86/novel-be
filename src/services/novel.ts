@@ -33,6 +33,15 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     translator_id: data.translator_id ?? undefined,
     created_at: data.created_at,
     updated_at: data.updated_at,
+    beta_status: data.beta_status === undefined ? "not_started" : data.beta_status,
+    has_published_beta: data.has_published_beta === true,
+    active_beta_run_id: data.active_beta_run_id ?? null,
+    latest_beta_run_id: data.latest_beta_run_id ?? null,
+    beta_target_count: data.beta_target_count ?? 0,
+    beta_completed_count: data.beta_completed_count ?? 0,
+    beta_failed_count: data.beta_failed_count ?? 0,
+    beta_updated_at: data.beta_updated_at ?? null,
+    beta_last_published_at: data.beta_last_published_at ?? null,
   };
 }
 
@@ -817,18 +826,29 @@ export async function deleteNovel(novelId: string): Promise<void> {
   // Verify novel exists
   await getNovel(novelId);
 
-  // Delete all chapters in subcollection
-  const chaptersSnapshot = await db.collection("novels").doc(novelId).collection("chapters").get();
-
-  const batch = db.batch();
-  for (const doc of chaptersSnapshot.docs) {
-    batch.delete(doc.ref);
-  }
-  if (chaptersSnapshot.size > 0) {
-    await batch.commit();
-  }
+  // Recursively delete all subcollections so no orphaned data remains
+  // (chapters, beta_runs and their nested source_chapters/beta_chapters).
+  const novelRef = db.collection("novels").doc(novelId);
+  await Promise.all([
+    novelRef
+      .collection("chapters")
+      .get()
+      .then(async (snapshot) => {
+        const refs = snapshot.docs.map((doc) => doc.ref);
+        if (refs.length === 0) return;
+        await Promise.all(refs.map((ref) => db.recursiveDelete(ref)));
+      }),
+    novelRef
+      .collection("beta_runs")
+      .get()
+      .then(async (snapshot) => {
+        const refs = snapshot.docs.map((doc) => doc.ref);
+        if (refs.length === 0) return;
+        await Promise.all(refs.map((ref) => db.recursiveDelete(ref)));
+      }),
+  ]);
 
   // Delete novel document
-  await db.collection("novels").doc(novelId).delete();
-  logger.info("Novel deleted", { novelId, chaptersDeleted: chaptersSnapshot.size });
+  await novelRef.delete();
+  logger.info("Novel deleted", { novelId });
 }

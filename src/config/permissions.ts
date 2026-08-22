@@ -77,6 +77,20 @@ export const PERMISSION_DEFINITIONS = [
     description: "Thay đổi dịch giả phụ trách truyện.",
   },
   {
+    key: "novels.beta.generate",
+    group: "novels",
+    group_label: "Truyện",
+    label: "Beta truyện bằng AI",
+    description: "Tạo, xem và chạy lại phiên bản Beta bằng AI.",
+  },
+  {
+    key: "novels.beta.publish",
+    group: "novels",
+    group_label: "Truyện",
+    label: "Publish bản Beta",
+    description: "Cho phép dùng bản Beta thay thế nội dung chương hiện tại.",
+  },
+  {
     key: "chapters.manage.own",
     group: "chapters",
     group_label: "Chương truyện",
