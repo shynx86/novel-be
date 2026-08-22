@@ -3,6 +3,16 @@ export type NovelPublicationStatus = "draft" | "public";
 export type ChapterAccessType = "free" | "free_auth" | "paid";
 export type ChapterPublicationStatus = "draft" | "scheduled" | "public";
 export type SubscriptionType = "chapter" | "novel";
+export type BetaDashboardStatus =
+  | "not_started"
+  | "initializing"
+  | "queued"
+  | "processing"
+  | "review_ready"
+  | "partial_failed"
+  | "failed"
+  | "cancelled"
+  | "published";
 
 export interface NovelDocument {
   id: string;
@@ -24,6 +34,15 @@ export interface NovelDocument {
   translator_id?: string;
   created_at: string;
   updated_at: string;
+  beta_status?: BetaDashboardStatus;
+  has_published_beta?: boolean;
+  active_beta_run_id?: string | null;
+  latest_beta_run_id?: string | null;
+  beta_target_count?: number;
+  beta_completed_count?: number;
+  beta_failed_count?: number;
+  beta_updated_at?: string | null;
+  beta_last_published_at?: string | null;
   genres?: { id: string; name: string }[];
   authors?: { id: string; name: string }[];
   translator?: { id: string; name: string; username: string };

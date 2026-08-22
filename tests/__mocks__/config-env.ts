@@ -6,4 +6,12 @@ export const env = {
   firebaseApiKey: "test-api-key",
   firestoreDatabaseId: "",
   version: "1.0.0",
+  deepSeekApiKey: "test-deepseek-key",
+  deepSeekBaseUrl: "https://api.deepseek.com",
+  deepSeekModel: "test-model",
+  deepSeekTimeoutMs: 90000,
+  betaMaxChapters: 10,
+  betaCustomPromptMaxLength: 4000,
+  betaMaxInputCharacters: 120000,
+  betaPromptTemplateVersion: "v1",
 };
