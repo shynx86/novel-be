@@ -5,7 +5,13 @@ describe("Beta model catalog", () => {
   it("returns the backend-configured catalog and default", () => {
     expect(getBetaModelCatalog()).toEqual({
       default_model: "test-model",
-      models: ["test-model", "openai/gpt-5.6-luna"],
+      models: [
+        "test-model",
+        "openai/gpt-5.6-luna",
+        "google/gemini-2.5-flash-lite",
+        "inclusionai/ling-2.6-flash",
+        "openai/gpt-5-nano",
+      ],
     });
   });
 
@@ -14,8 +20,16 @@ describe("Beta model catalog", () => {
     expect(resolveBetaModel("   ")).toBe("test-model");
   });
 
-  it("accepts an allowed model and rejects an unknown model", () => {
-    expect(resolveBetaModel(" openai/gpt-5.6-luna ")).toBe("openai/gpt-5.6-luna");
+  it.each([
+    "openai/gpt-5.6-luna",
+    "google/gemini-2.5-flash-lite",
+    "inclusionai/ling-2.6-flash",
+    "openai/gpt-5-nano",
+  ])("accepts allowed model %s", (model) => {
+    expect(resolveBetaModel(` ${model} `)).toBe(model);
+  });
+
+  it("rejects an unknown model", () => {
     expect(() => resolveBetaModel("unknown/model")).toThrow("Unsupported Beta model");
   });
 });

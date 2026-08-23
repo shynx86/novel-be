@@ -58,7 +58,13 @@ describe("GET /api/admin/beta/models", () => {
     await expect(response.json()).resolves.toEqual({
       data: {
         default_model: "test-model",
-        models: ["test-model", "openai/gpt-5.6-luna"],
+        models: [
+          "test-model",
+          "openai/gpt-5.6-luna",
+          "google/gemini-2.5-flash-lite",
+          "inclusionai/ling-2.6-flash",
+          "openai/gpt-5-nano",
+        ],
       },
     });
   });
