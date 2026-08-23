@@ -48,6 +48,22 @@ beforeEach(() => {
   mockRoleDocGet.mockResolvedValue({ exists: false, data: () => undefined });
 });
 
+describe("GET /api/admin/beta/models", () => {
+  it("returns the backend-configured model catalog", async () => {
+    const response = await app.request("/api/admin/beta/models", {
+      headers: { Authorization: "Bearer admin-token" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        default_model: "test-model",
+        models: ["test-model", "openai/gpt-5.6-luna"],
+      },
+    });
+  });
+});
+
 describe("GET /api/admin/beta/runs", () => {
   it("returns every beta version regardless of status", async () => {
     mockQueryGet.mockResolvedValue({

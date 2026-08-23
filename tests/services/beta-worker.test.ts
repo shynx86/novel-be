@@ -95,4 +95,83 @@ describe("processBetaChapterTask", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(mockTransactionUpdate).not.toHaveBeenCalled();
   });
+
+  it("uses the model pinned to the run when calling the AI provider", async () => {
+    const selectedModel = "openai/gpt-5.6-luna";
+    const initialRun = { ...runDoc(), model: selectedModel, completed_count: 0 };
+    const completedRun = { ...initialRun, completed_count: 1 };
+
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({
+          index: 1,
+          title: "Chương 1",
+          content: null,
+          word_count: null,
+          status: "pending",
+          source_hash: "abc",
+          attempt_count: 0,
+          model: selectedModel,
+          usage: null,
+          processing_started_at: null,
+          completed_at: null,
+          published_at: null,
+          error: null,
+        }),
+      })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({
+          index: 1,
+          title: "Chương 1",
+          content: "Nội dung gốc",
+          word_count: 3,
+          source_hash: "abc",
+          source_updated_at: "2026-01-01T00:00:00.000Z",
+          created_at: "2026-01-01T00:00:00.000Z",
+        }),
+      })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({
+          id: "novel-1",
+          slug: "novel-1",
+          title: "Novel 1",
+          chapter_count: 1,
+          created_at: "2026-01-01T00:00:00.000Z",
+          updated_at: "2026-01-01T00:00:00.000Z",
+        }),
+      })
+      .mockResolvedValueOnce({ exists: true, data: () => completedRun });
+
+    mockTransactionGet
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ status: "pending", attempt_count: 0 }),
+      })
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({ exists: true, data: () => completedRun });
+
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "Nội dung Beta" } }],
+          usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await processBetaChapterTask({ novelId: "novel-1", runId: "run-1", chapterIndex: 1 });
+
+    const request = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({ model: selectedModel });
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "completed", model: selectedModel }),
+    );
+  });
 });

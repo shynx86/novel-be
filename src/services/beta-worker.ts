@@ -175,6 +175,7 @@ async function completeChapter(
   chapterIndex: number,
   result: {
     content: string;
+    model: string;
     usage: { promptTokens: number; completionTokens: number; totalTokens: number };
   },
   previousStatus: BetaChapterStatus,
@@ -199,6 +200,7 @@ async function completeChapter(
       content: result.content,
       word_count: countWords(result.content),
       status: "completed",
+      model: result.model,
       completed_at: now,
       usage: {
         prompt_tokens: result.usage.promptTokens,
@@ -287,14 +289,17 @@ export async function processBetaChapterTask(payload: BetaChapterTaskPayload): P
   const previousExcerpt = await loadPreviousExcerpt(novelId, runId, run, chapterIndex);
 
   try {
-    const result = await rewriteChapter({
-      novelTitle: novel.title,
-      chapterIndex,
-      chapterTitle: source.title,
-      sourceContent: source.content,
-      customPrompt: run.custom_prompt,
-      previousChapterExcerpt: previousExcerpt,
-    });
+    const result = await rewriteChapter(
+      {
+        novelTitle: novel.title,
+        chapterIndex,
+        chapterTitle: source.title,
+        sourceContent: source.content,
+        customPrompt: run.custom_prompt,
+        previousChapterExcerpt: previousExcerpt,
+      },
+      { model: run.model },
+    );
     const completed = await completeChapter(novelId, runId, chapterIndex, result, previousStatus);
     if (!completed) return;
     logger.info("Beta chapter completed", {
