@@ -7,6 +7,7 @@ import {
   loadActorMiddleware,
   requirePermission,
 } from "../middleware/authorization.js";
+import { getBetaModelCatalog } from "../services/ai/beta-models.js";
 import { getFirestore } from "../services/firebase.js";
 import type { Actor } from "../types/auth.js";
 import type { BetaDashboardStatus, BetaRunStatus } from "../types/beta.js";
@@ -20,6 +21,11 @@ type Variables = {
 const ADMIN_BETA = new Hono<{ Variables: Variables }>();
 
 ADMIN_BETA.use("/*", authMiddleware, loadActorMiddleware, requirePermission("admin.access"));
+
+// GET /api/admin/beta/models — backend-owned catalog used by the create dialog.
+ADMIN_BETA.get("/models", requirePermission("novels.beta.generate"), (c) => {
+  return c.json({ data: getBetaModelCatalog() }, 200);
+});
 
 // Novel statuses shown in the "Beta" admin page: everything except
 // "not_started" and "published" is still actionable.

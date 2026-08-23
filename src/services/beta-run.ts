@@ -13,6 +13,7 @@ import type {
 import type { ChapterDocument, PaginatedResult } from "../types/novel.js";
 import { ConflictError, NotFoundError, ValidationError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
+import { resolveBetaModel } from "./ai/beta-models.js";
 import { DEFAULT_CUSTOM_PROMPT } from "./ai/beta-prompt.js";
 import { getFirestore } from "./firebase.js";
 import { getNovel } from "./novel.js";
@@ -140,7 +141,7 @@ async function selectBetaChapters(novelId: string): Promise<ChapterDocument[]> {
 
 export async function createBetaRun(
   novelId: string,
-  input: { custom_prompt?: string },
+  input: { custom_prompt?: string; model?: string },
   requestedBy: string,
 ): Promise<BetaRunCreateResult> {
   const db = getFirestore();
@@ -176,6 +177,7 @@ export async function createBetaRun(
   }
 
   const customPrompt = validateCustomPrompt(input.custom_prompt);
+  const model = resolveBetaModel(input.model);
   const runId = randomUUID();
   const chapterIndexes = chapters.map((chapter) => chapter.index);
   // Hash the resolved prompt actually sent to the model, not just the raw input.
@@ -193,8 +195,8 @@ export async function createBetaRun(
     custom_prompt: customPrompt,
     prompt_template_version: env.betaPromptTemplateVersion,
     prompt_hash: promptHash,
-    provider: "deepseek",
-    model: env.deepSeekModel,
+    provider: "openrouter",
+    model,
     requested_by: requestedBy,
     created_at: now,
     started_at: null,
@@ -250,7 +252,7 @@ export async function createBetaRun(
       status: "pending",
       source_hash: hashContent(chapter.content),
       attempt_count: 0,
-      model: env.deepSeekModel,
+      model,
       usage: null,
       processing_started_at: null,
       completed_at: null,

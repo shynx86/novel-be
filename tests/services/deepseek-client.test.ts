@@ -50,6 +50,18 @@ describe("rewriteChapter", () => {
     });
   });
 
+  it("sends an explicitly selected Beta model", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
+
+    const result = await rewriteChapter(base, { model: "openai/gpt-5.6-luna" });
+
+    const request = fetchMock.mock.calls[0]?.[1];
+    expect(JSON.parse(String(request?.body))).toMatchObject({
+      model: "openai/gpt-5.6-luna",
+    });
+    expect(result.model).toBe("openai/gpt-5.6-luna");
+  });
+
   it("strips markdown code fences", async () => {
     jest
       .spyOn(globalThis, "fetch")

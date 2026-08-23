@@ -83,27 +83,27 @@ function toPositiveInt(value: unknown): number {
 
 function classifyError(status: number): DeepSeekError {
   if (status === 408) {
-    return new DeepSeekError("timeout", "DeepSeek request timed out", status);
+    return new DeepSeekError("timeout", "AI provider request timed out", status);
   }
   if (status === 429) {
-    return new DeepSeekError("rate_limited", "DeepSeek rate limited", status);
+    return new DeepSeekError("rate_limited", "AI provider rate limited", status);
   }
   if (status >= 500 && status <= 599) {
-    return new DeepSeekError("server", `DeepSeek server error (${status})`, status);
+    return new DeepSeekError("server", `AI provider server error (${status})`, status);
   }
   if (status === 401 || status === 403) {
-    return new DeepSeekError("permanent", "DeepSeek authentication failed", status);
+    return new DeepSeekError("permanent", "AI provider authentication failed", status);
   }
   if (status === 404) {
-    return new DeepSeekError("permanent", "DeepSeek model not found", status);
+    return new DeepSeekError("permanent", "AI model not found", status);
   }
   if (status === 413) {
-    return new DeepSeekError("permanent", "DeepSeek request payload too large", status);
+    return new DeepSeekError("permanent", "AI provider request payload too large", status);
   }
   if (status === 400) {
-    return new DeepSeekError("permanent", "DeepSeek invalid request", status);
+    return new DeepSeekError("permanent", "AI provider rejected the request", status);
   }
-  return new DeepSeekError("permanent", `DeepSeek request failed (${status})`, status);
+  return new DeepSeekError("permanent", `AI provider request failed (${status})`, status);
 }
 
 export async function rewriteChapter(
@@ -116,10 +116,10 @@ export async function rewriteChapter(
   const timeoutMs = options.timeoutMs ?? env.deepSeekTimeoutMs;
 
   if (!apiKey) {
-    throw new DeepSeekError("permanent", "DeepSeek API key is not configured");
+    throw new DeepSeekError("permanent", "AI provider API key is not configured");
   }
   if (!model) {
-    throw new DeepSeekError("permanent", "DeepSeek model is not configured");
+    throw new DeepSeekError("permanent", "AI model is not configured");
   }
 
   const prompt = buildBetaPrompt(input);
@@ -151,9 +151,9 @@ export async function rewriteChapter(
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      throw new DeepSeekError("timeout", "DeepSeek request timed out");
+      throw new DeepSeekError("timeout", "AI provider request timed out");
     }
-    throw new DeepSeekError("server", `DeepSeek connection failed: ${errorMessage(error)}`);
+    throw new DeepSeekError("server", `AI provider connection failed: ${errorMessage(error)}`);
   } finally {
     clearTimeout(timeout);
   }
@@ -167,17 +167,17 @@ export async function rewriteChapter(
   try {
     payload = (await response.json()) as DeepSeekApiResponse;
   } catch {
-    throw new DeepSeekError("invalid_response", "DeepSeek returned an invalid JSON response");
+    throw new DeepSeekError("invalid_response", "AI provider returned an invalid JSON response");
   }
 
   const rawContent = payload.choices?.[0]?.message?.content;
   if (typeof rawContent !== "string") {
-    throw new DeepSeekError("invalid_response", "DeepSeek response is missing content");
+    throw new DeepSeekError("invalid_response", "AI response is missing content");
   }
 
   const content = stripCodeFence(rawContent);
   if (!content.trim()) {
-    throw new DeepSeekError("invalid_response", "DeepSeek returned an empty response");
+    throw new DeepSeekError("invalid_response", "AI provider returned an empty response");
   }
 
   const usage = {

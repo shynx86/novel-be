@@ -117,6 +117,38 @@ describe("beta-run create", () => {
     );
   });
 
+  it("pins an allowed selected model to the run and chapter snapshots", async () => {
+    mockDocGet.mockResolvedValue({ exists: true, data: () => novelDoc });
+    mockQueryGet.mockResolvedValue({
+      docs: [chapter(1)].map((data) => ({ data: () => data })),
+      empty: false,
+    });
+    mockTransactionGet.mockResolvedValue({ exists: true, data: () => novelDoc });
+
+    await createBetaRun("novel-1", { custom_prompt: "", model: "openai/gpt-5.6-luna" }, "user-1");
+
+    expect(mockTransactionSet).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ provider: "openrouter", model: "openai/gpt-5.6-luna" }),
+    );
+    expect(mockBatchSet).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "pending", model: "openai/gpt-5.6-luna" }),
+    );
+  });
+
+  it("rejects a model outside the backend allowlist", async () => {
+    mockDocGet.mockResolvedValue({ exists: true, data: () => novelDoc });
+    mockQueryGet.mockResolvedValue({
+      docs: [chapter(1)].map((data) => ({ data: () => data })),
+      empty: false,
+    });
+
+    await expect(
+      createBetaRun("novel-1", { custom_prompt: "", model: "unknown/model" }, "user-1"),
+    ).rejects.toThrow("Unsupported Beta model");
+  });
+
   it("hashes the resolved default prompt instead of an empty custom prompt", async () => {
     mockDocGet.mockResolvedValue({ exists: true, data: () => novelDoc });
     mockQueryGet.mockResolvedValue({

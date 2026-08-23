@@ -28,7 +28,8 @@ export type BetaDashboardStatus =
   | "cancelled"
   | "published";
 
-export type BetaProvider = "deepseek";
+// "deepseek" is retained for Beta runs created before the OpenRouter model catalog.
+export type BetaProvider = "deepseek" | "openrouter";
 
 export type BetaErrorType =
   | "provider"

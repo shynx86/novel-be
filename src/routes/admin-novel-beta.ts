@@ -57,8 +57,9 @@ adminNovelBeta.post("/:novelId/beta-runs", requirePermission("novels.beta.genera
 
   const body = await c.req.json().catch(() => ({}));
   const customPrompt = body.custom_prompt;
+  const model = body.model;
 
-  const result = await createBetaRun(novelId, { custom_prompt: customPrompt }, actor.userId);
+  const result = await createBetaRun(novelId, { custom_prompt: customPrompt, model }, actor.userId);
   await enqueueBetaChapterTask({
     novelId,
     runId: result.id,
