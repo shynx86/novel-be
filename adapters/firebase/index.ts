@@ -49,7 +49,7 @@ export const api = onRequest(
 
 export const publishScheduledChapters = onSchedule(
   {
-    schedule: "every 1 minutes",
+    schedule: "every 30 minutes",
     timeZone: "UTC",
     timeoutSeconds: 60,
     retryCount: 3,
