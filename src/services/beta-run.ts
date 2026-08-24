@@ -350,6 +350,18 @@ export interface BetaChapterSummary {
   completed_at: string | null;
   published_at: string | null;
   model: string;
+  is_stalled: boolean;
+}
+
+function isChapterStalled(
+  status: BetaChapterDocument["status"],
+  processingStartedAt: string | null,
+  now = Date.now(),
+): boolean {
+  if (status !== "processing" && status !== "retrying") return false;
+  if (!processingStartedAt) return true;
+  const startedAt = Date.parse(processingStartedAt);
+  return !Number.isFinite(startedAt) || now - startedAt >= env.betaChapterStaleMs;
 }
 
 export async function getBetaRunWithChapters(
@@ -382,6 +394,7 @@ export async function getBetaRunWithChapters(
 
   const chapters: BetaChapterSummary[] = snapshot.docs.map((doc) => {
     const data = doc.data();
+    const processingStartedAt = data.processing_started_at ?? null;
     return {
       index: data.index,
       title: data.title,
@@ -390,10 +403,11 @@ export async function getBetaRunWithChapters(
       attempt_count: data.attempt_count ?? 0,
       usage: data.usage ?? null,
       error: data.error ?? null,
-      processing_started_at: data.processing_started_at ?? null,
+      processing_started_at: processingStartedAt,
       completed_at: data.completed_at ?? null,
       published_at: data.published_at ?? null,
       model: data.model ?? "",
+      is_stalled: isChapterStalled(data.status, processingStartedAt),
     };
   });
   return { run, chapters };
@@ -553,18 +567,27 @@ export async function retryBetaRun(
 
   const indexes =
     chapterIndexes && chapterIndexes.length > 0 ? chapterIndexes : run.chapter_indexes;
-  const failedIndexes = new Set<number>();
+  const retryableIndexes = new Set<number>();
+  let failedRetryCount = 0;
   for (const index of indexes) {
     const chapter = await getBetaChapter(novelId, runId, index);
-    if (chapter.status === "failed") failedIndexes.add(index);
+    if (chapter.status === "failed") {
+      retryableIndexes.add(index);
+      failedRetryCount += 1;
+    } else if (isChapterStalled(chapter.status, chapter.processing_started_at)) {
+      retryableIndexes.add(index);
+    }
   }
-  if (failedIndexes.size === 0) {
-    throw new ValidationError("No failed chapters to retry", { code: "BETA_INCOMPLETE" });
+  if (retryableIndexes.size === 0) {
+    throw new ValidationError("No failed or stalled chapters to retry", {
+      code: "BETA_INCOMPLETE",
+    });
   }
 
   const now = new Date().toISOString();
+  const nextFailedCount = Math.max(0, run.failed_count - failedRetryCount);
   await db.runTransaction(async (transaction) => {
-    for (const index of failedIndexes) {
+    for (const index of retryableIndexes) {
       transaction.update(getBetaChapterRef(novelId, runId, index), {
         status: "pending",
         error: null,
@@ -576,11 +599,14 @@ export async function retryBetaRun(
       status: "processing",
       current_chapter_index: null,
       error: null,
+      failed_count: nextFailedCount,
+      completed_at: null,
     });
     transaction.update(db.collection("novels").doc(novelId), {
       active_beta_run_id: runId,
       latest_beta_run_id: runId,
       beta_status: "processing",
+      beta_failed_count: nextFailedCount,
       beta_updated_at: now,
     });
   });
@@ -589,8 +615,8 @@ export async function retryBetaRun(
     novelId,
     runId,
     actorId: requestedBy,
-    failedIndexes: [...failedIndexes],
+    retriedIndexes: [...retryableIndexes],
   });
 
-  return [...failedIndexes];
+  return [...retryableIndexes];
 }

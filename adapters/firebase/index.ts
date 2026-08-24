@@ -6,6 +6,7 @@ import { onTaskDispatched } from "firebase-functions/v2/tasks";
 
 setGlobalOptions({ region: "asia-southeast1" });
 import { app } from "../../src/app.js";
+import { env } from "../../src/config/env.js";
 import { processBetaChapterTask } from "../../src/services/beta-worker.js";
 import { publishDueChapters } from "../../src/services/chapter-publication.js";
 
@@ -64,7 +65,7 @@ export const publishScheduledChapters = onSchedule(
 export const processBetaChapter = onTaskDispatched(
   {
     retryConfig: {
-      maxAttempts: 5,
+      maxAttempts: env.betaTaskMaxAttempts,
       minBackoffSeconds: 10,
       maxBackoffSeconds: 300,
     },
@@ -76,6 +77,9 @@ export const processBetaChapter = onTaskDispatched(
   },
   async (request) => {
     const payload = request.data as { novelId: string; runId: string; chapterIndex: number };
-    await processBetaChapterTask(payload);
+    await processBetaChapterTask(payload, {
+      retryCount: request.retryCount,
+      maxAttempts: env.betaTaskMaxAttempts,
+    });
   },
 );

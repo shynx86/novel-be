@@ -36,4 +36,6 @@ export const env = {
   ),
   betaMaxInputCharacters: Number.parseInt(process.env.BETA_MAX_INPUT_CHARACTERS || "120000", 10),
   betaPromptTemplateVersion: process.env.BETA_PROMPT_TEMPLATE_VERSION || "v1",
+  betaTaskMaxAttempts: Number.parseInt(process.env.BETA_TASK_MAX_ATTEMPTS || "5", 10),
+  betaChapterStaleMs: Number.parseInt(process.env.BETA_CHAPTER_STALE_MS || "600000", 10),
 } as const;
