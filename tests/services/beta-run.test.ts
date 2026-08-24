@@ -249,7 +249,10 @@ describe("beta-run retry", () => {
 
   it("only retries chapters that failed", async () => {
     mockDocGet
-      .mockResolvedValueOnce({ exists: true, data: () => runDoc() })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({ ...runDoc("partial_failed"), completed_count: 1, failed_count: 1 }),
+      })
       .mockResolvedValueOnce({ exists: true, data: () => novelDoc })
       // getBetaChapter calls for each requested index (1,2)
       .mockResolvedValueOnce({ exists: true, data: () => betaChapter(1, "failed") })
@@ -258,6 +261,29 @@ describe("beta-run retry", () => {
     const retried = await retryBetaRun("novel-1", "run-1", "user-1", [1, 2]);
 
     expect(retried).toEqual([1]);
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ failed_count: 0, completed_at: null }),
+    );
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ beta_failed_count: 0 }),
+    );
+  });
+
+  it("allows a stale processing chapter to be recovered", async () => {
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => runDoc("processing") })
+      .mockResolvedValueOnce({ exists: true, data: () => novelDoc })
+      .mockResolvedValueOnce({
+        exists: true,
+        data: () => ({
+          ...betaChapter(1, "processing"),
+          processing_started_at: "2000-01-01T00:00:00.000Z",
+        }),
+      });
+
+    await expect(retryBetaRun("novel-1", "run-1", "user-1", [1])).resolves.toEqual([1]);
   });
 });
 

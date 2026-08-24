@@ -174,4 +174,104 @@ describe("processBetaChapterTask", () => {
       expect.objectContaining({ status: "completed", model: selectedModel }),
     );
   });
+
+  it("stores a retrying error before asking the queue to retry", async () => {
+    const initialRun = { ...runDoc(), completed_count: 0 };
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({ exists: true, data: () => pendingChapter() })
+      .mockResolvedValueOnce({ exists: true, data: () => sourceChapter() })
+      .mockResolvedValueOnce({ exists: true, data: () => novelDocument() });
+    mockTransactionGet
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({ exists: true, data: () => ({ status: "pending" }) })
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun });
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 429 }));
+
+    await expect(
+      processBetaChapterTask(
+        { novelId: "novel-1", runId: "run-1", chapterIndex: 1 },
+        { retryCount: 0, maxAttempts: 5 },
+      ),
+    ).rejects.toThrow("rate limited");
+
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: "retrying",
+        error: expect.objectContaining({ code: "BETA_PROVIDER_RATE_LIMITED" }),
+      }),
+    );
+  });
+
+  it("marks the chapter failed when the final provider attempt is exhausted", async () => {
+    const initialRun = { ...runDoc(), completed_count: 0 };
+    const failedRun = { ...initialRun, failed_count: 1 };
+    mockDocGet
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({ exists: true, data: () => pendingChapter() })
+      .mockResolvedValueOnce({ exists: true, data: () => sourceChapter() })
+      .mockResolvedValueOnce({ exists: true, data: () => novelDocument() })
+      .mockResolvedValueOnce({ exists: true, data: () => failedRun });
+    mockTransactionGet
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({ exists: true, data: () => ({ status: "pending" }) })
+      .mockResolvedValueOnce({ exists: true, data: () => initialRun })
+      .mockResolvedValueOnce({ exists: true, data: () => failedRun });
+    jest.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 429 }));
+
+    await processBetaChapterTask(
+      { novelId: "novel-1", runId: "run-1", chapterIndex: 1 },
+      { retryCount: 4, maxAttempts: 5 },
+    );
+
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: "failed",
+        error: expect.objectContaining({ code: "BETA_PROVIDER_RATE_LIMITED" }),
+      }),
+    );
+  });
 });
+
+function pendingChapter() {
+  return {
+    index: 1,
+    title: "Chương 1",
+    content: null,
+    word_count: null,
+    status: "pending",
+    source_hash: "abc",
+    attempt_count: 0,
+    model: "test-model",
+    usage: null,
+    processing_started_at: null,
+    completed_at: null,
+    published_at: null,
+    error: null,
+  };
+}
+
+function sourceChapter() {
+  return {
+    index: 1,
+    title: "Chương 1",
+    content: "Nội dung gốc",
+    word_count: 3,
+    source_hash: "abc",
+    source_updated_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function novelDocument() {
+  return {
+    id: "novel-1",
+    slug: "novel-1",
+    title: "Novel 1",
+    chapter_count: 1,
+    created_at: "2026-01-01T00:00:00.000Z",
+    updated_at: "2026-01-01T00:00:00.000Z",
+  };
+}

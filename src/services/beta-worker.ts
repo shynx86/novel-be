@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 import type { BetaChapterStatus, BetaError, BetaRunDocument } from "../types/beta.js";
 import { logger } from "../utils/logger.js";
 import { DeepSeekError, isRetryableDeepSeekError, rewriteChapter } from "./ai/deepseek-client.js";
@@ -17,6 +18,11 @@ export interface BetaChapterTaskPayload {
   novelId: string;
   runId: string;
   chapterIndex: number;
+}
+
+export interface BetaTaskExecutionContext {
+  retryCount?: number;
+  maxAttempts?: number;
 }
 
 const PREVIOUS_EXCERPT_CHARACTERS = 2000;
@@ -147,12 +153,19 @@ async function claimChapter(
     const data = chapterDoc.data();
     if (!chapterDoc.exists || !data) throw new Error("Beta chapter not found");
     previousStatus = data.status as BetaChapterStatus;
-    if (previousStatus === "cancelled") return;
+    if (
+      previousStatus === "cancelled" ||
+      previousStatus === "completed" ||
+      previousStatus === "published"
+    ) {
+      return;
+    }
     claimed = true;
     transaction.update(chapterRef, {
       status: "processing",
       attempt_count: (data.attempt_count ?? 0) + 1,
       processing_started_at: now,
+      error: null,
     });
     transaction.update(runRef, {
       status: "processing",
@@ -260,7 +273,41 @@ async function failChapter(
   return failed;
 }
 
-export async function processBetaChapterTask(payload: BetaChapterTaskPayload): Promise<void> {
+async function markChapterRetrying(
+  novelId: string,
+  runId: string,
+  chapterIndex: number,
+  error: BetaError,
+): Promise<boolean> {
+  const db = getFirestore();
+  const now = new Date().toISOString();
+  let retrying = false;
+  await db.runTransaction(async (transaction) => {
+    const runDoc = await transaction.get(getRunRef(novelId, runId));
+    if (runDoc.data()?.status === "cancelled") return;
+    retrying = true;
+    transaction.update(getBetaChapterRef(novelId, runId, chapterIndex), {
+      status: "retrying",
+      error,
+      completed_at: null,
+    });
+    transaction.update(getRunRef(novelId, runId), {
+      status: "processing",
+      current_chapter_index: chapterIndex,
+      error,
+    });
+    transaction.update(db.collection("novels").doc(novelId), {
+      beta_status: "processing",
+      beta_updated_at: now,
+    });
+  });
+  return retrying;
+}
+
+export async function processBetaChapterTask(
+  payload: BetaChapterTaskPayload,
+  context: BetaTaskExecutionContext = {},
+): Promise<void> {
   const { novelId, runId, chapterIndex } = payload;
   const startedAt = Date.now();
 
@@ -282,13 +329,12 @@ export async function processBetaChapterTask(payload: BetaChapterTaskPayload): P
     return;
   }
 
-  const [source, novel] = await Promise.all([
-    getSourceChapter(novelId, runId, chapterIndex),
-    getNovel(novelId),
-  ]);
-  const previousExcerpt = await loadPreviousExcerpt(novelId, runId, run, chapterIndex);
-
   try {
+    const [source, novel] = await Promise.all([
+      getSourceChapter(novelId, runId, chapterIndex),
+      getNovel(novelId),
+    ]);
+    const previousExcerpt = await loadPreviousExcerpt(novelId, runId, run, chapterIndex);
     const result = await rewriteChapter(
       {
         novelTitle: novel.title,
@@ -315,16 +361,24 @@ export async function processBetaChapterTask(payload: BetaChapterTaskPayload): P
     });
   } catch (error) {
     if (error instanceof DeepSeekError && isRetryableDeepSeekError(error)) {
-      // Let the task queue retry with backoff.
-      logger.warn("Beta chapter retryable failure", {
-        novelId,
-        runId,
-        chapterIndex,
-        attempt: betaChapter.attempt_count + 1,
-        durationMs: Date.now() - startedAt,
-        type: error.type,
-      });
-      throw error;
+      const retryCount = context.retryCount ?? 0;
+      const maxAttempts = context.maxAttempts ?? env.betaTaskMaxAttempts;
+      const betaError = toBetaError(error);
+      if (retryCount + 1 < maxAttempts) {
+        const retrying = await markChapterRetrying(novelId, runId, chapterIndex, betaError);
+        if (!retrying) return;
+        logger.warn("Beta chapter scheduled for retry", {
+          novelId,
+          runId,
+          chapterIndex,
+          attempt: betaChapter.attempt_count + 1,
+          retryCount,
+          maxAttempts,
+          durationMs: Date.now() - startedAt,
+          type: error.type,
+        });
+        throw error;
+      }
     }
     const betaError =
       error instanceof DeepSeekError

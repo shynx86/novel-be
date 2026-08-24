@@ -12,6 +12,7 @@ export type BetaRunStatus =
 export type BetaChapterStatus =
   | "pending"
   | "processing"
+  | "retrying"
   | "completed"
   | "failed"
   | "cancelled"

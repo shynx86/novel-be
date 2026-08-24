@@ -22,4 +22,6 @@ export const env = {
   betaCustomPromptMaxLength: 4000,
   betaMaxInputCharacters: 120000,
   betaPromptTemplateVersion: "v1",
+  betaTaskMaxAttempts: 5,
+  betaChapterStaleMs: 600000,
 };
