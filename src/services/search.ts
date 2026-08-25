@@ -27,7 +27,7 @@ const MAX_CANDIDATES = 250;
 const OPTIONS_CACHE_MS = 5 * 60_000;
 let optionsCache: { expiresAt: number; value: SearchOptions } | null = null;
 
-function normalizeTitle(value: string): string {
+export function normalizeSearchText(value: string): string {
   return value.trim().toLocaleLowerCase("vi");
 }
 
@@ -126,13 +126,10 @@ async function loadCandidates(
     };
   }
 
-  const title = normalizeTitle(params.title || "");
   const snapshot = await db
     .collection("novels")
     .where("publication_status", "==", "public")
     .orderBy("title_lowercase")
-    .startAt(title)
-    .endAt(`${title}\uf8ff`)
     .limit(MAX_CANDIDATES)
     .get();
   return {
@@ -146,12 +143,12 @@ export async function searchNovels(params: NovelSearchParams): Promise<NovelSear
   const limit = Math.min(params.limit || 20, 30);
   const candidates = await loadCandidates(params);
   const enriched = await enrichNovelsWithRelations(candidates.items);
-  const title = normalizeTitle(params.title || "");
+  const title = normalizeSearchText(params.title || "");
   const author = toVietnameseSlug(params.author || "");
 
   const matches = enriched
     .filter((novel) => novel.publication_status === "public")
-    .filter((novel) => !title || normalizeTitle(novel.title).includes(title))
+    .filter((novel) => !title || normalizeSearchText(novel.title).includes(title))
     .filter(
       (novel) =>
         !author || novel.authors?.some((item) => toVietnameseSlug(item.name).includes(author)),
