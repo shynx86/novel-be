@@ -64,6 +64,9 @@ describe("GET /api/admin/beta/models", () => {
           "google/gemini-2.5-flash-lite",
           "inclusionai/ling-2.6-flash",
           "openai/gpt-5-nano",
+          "google/gemini-3.7-flash",
+          "xiaomi/mimo-v2.5",
+          "qwen/qwen3.7-flash",
         ],
       },
     });
