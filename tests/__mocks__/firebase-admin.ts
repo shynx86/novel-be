@@ -40,6 +40,14 @@ export const mockCollectionAdd: any = jest.fn();
 export const mockQueryGet: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockCountGet: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockQueryWhere: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockQueryOrderBy: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockQueryLimit: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockQueryOffset: any = jest.fn();
 
 // Transaction mocks
 // biome-ignore lint/suspicious/noExplicitAny: mock module
@@ -88,12 +96,24 @@ mockRunTransaction.mockImplementation(async (fn: any) => {
 function createQueryBuilder() {
   // biome-ignore lint/suspicious/noExplicitAny: mock module
   const builder: Record<string, any> = {};
-  builder.where = jest.fn(() => builder);
-  builder.orderBy = jest.fn(() => builder);
+  builder.where = jest.fn((...args: unknown[]) => {
+    mockQueryWhere(...args);
+    return builder;
+  });
+  builder.orderBy = jest.fn((...args: unknown[]) => {
+    mockQueryOrderBy(...args);
+    return builder;
+  });
   builder.startAt = jest.fn(() => builder);
   builder.endAt = jest.fn(() => builder);
-  builder.limit = jest.fn(() => builder);
-  builder.offset = jest.fn(() => builder);
+  builder.limit = jest.fn((...args: unknown[]) => {
+    mockQueryLimit(...args);
+    return builder;
+  });
+  builder.offset = jest.fn((...args: unknown[]) => {
+    mockQueryOffset(...args);
+    return builder;
+  });
   builder.select = jest.fn(() => builder);
   builder.get = mockQueryGet;
   builder.count = jest.fn(() => ({ get: mockCountGet }));

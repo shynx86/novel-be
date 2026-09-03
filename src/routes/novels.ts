@@ -29,6 +29,7 @@ type Variables = {
 };
 
 const novels = new Hono<{ Variables: Variables }>();
+const CURATED_NOVEL_PAGE_SIZE = 10;
 
 // GET /api/novels/sitemap
 novels.get("/sitemap", async (c) => {
@@ -38,9 +39,9 @@ novels.get("/sitemap", async (c) => {
 
 // GET /api/novels/trending
 novels.get("/trending", async (c) => {
-  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const { page } = parsePagination(c.req.query("page"), undefined, CURATED_NOVEL_PAGE_SIZE);
   const search = c.req.query("search") || undefined;
-  const result = await getTrendingNovels(page, limit, search);
+  const result = await getTrendingNovels(page, CURATED_NOVEL_PAGE_SIZE, search);
   return c.json({ data: result }, 200);
 });
 
@@ -54,17 +55,17 @@ novels.get("/completed", async (c) => {
 
 // GET /api/novels/featured
 novels.get("/featured", async (c) => {
-  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const { page } = parsePagination(c.req.query("page"), undefined, CURATED_NOVEL_PAGE_SIZE);
   const search = c.req.query("search") || undefined;
-  const result = await getFeaturedNovels(page, limit, search);
+  const result = await getFeaturedNovels(page, CURATED_NOVEL_PAGE_SIZE, search);
   return c.json({ data: result }, 200);
 });
 
 // GET /api/novels/completed-featured
 novels.get("/completed-featured", async (c) => {
-  const { page, limit } = parsePagination(c.req.query("page"), c.req.query("limit"), 10);
+  const { page } = parsePagination(c.req.query("page"), undefined, CURATED_NOVEL_PAGE_SIZE);
   const search = c.req.query("search") || undefined;
-  const result = await getCompletedFeaturedNovels(page, limit, search);
+  const result = await getCompletedFeaturedNovels(page, CURATED_NOVEL_PAGE_SIZE, search);
   return c.json({ data: result }, 200);
 });
 

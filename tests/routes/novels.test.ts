@@ -5,6 +5,9 @@ import {
   mockDocGet,
   mockGetAll,
   mockQueryGet,
+  mockQueryLimit,
+  mockQueryOffset,
+  mockQueryWhere,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
 
@@ -89,6 +92,73 @@ describe("GET /api/novels", () => {
     expect(body.data.items[0].title).toBe("Test Novel");
     expect(body.data.total).toBe(1);
     expect(body.data.page).toBe(1);
+  });
+});
+
+// ─── Curated novel lists ──────────────────────────────────────────────
+
+describe("curated novel list pagination", () => {
+  it.each([
+    ["/api/novels/trending?limit=6", []],
+    ["/api/novels/featured?limit=12", [["is_featured", "==", true]]],
+    [
+      "/api/novels/completed-featured?limit=100",
+      [
+        ["status", "==", "completed"],
+        ["is_featured", "==", true],
+      ],
+    ],
+  ])("fixes page size at 10 for %s", async (path, filters) => {
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 0 }) });
+    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
+
+    const res = await app.request(path);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toMatchObject({ items: [], page: 1, limit: 10, total: 0 });
+    expect(mockQueryWhere).toHaveBeenCalledWith("publication_status", "==", "public");
+    for (const filter of filters) {
+      expect(mockQueryWhere).toHaveBeenCalledWith(...filter);
+    }
+    expect(mockQueryLimit).toHaveBeenCalledWith(10);
+  });
+
+  it("uses the fixed page size to offset the second page", async () => {
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 15 }) });
+    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
+
+    const res = await app.request("/api/novels/trending?page=2&limit=100");
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toMatchObject({ page: 2, limit: 10, total: 15 });
+    expect(mockQueryOffset).toHaveBeenCalledWith(10);
+    expect(mockQueryLimit).toHaveBeenCalledWith(10);
+  });
+
+  it("keeps search ranking behavior while limiting its response to 10 novels", async () => {
+    const searchResults = Array.from({ length: 11 }, (_, index) => ({
+      id: `novel-${index + 1}`,
+      data: () => ({
+        ...mockNovelDoc,
+        title: `Novel ${index + 1}`,
+        publication_status: "public",
+        views: 9,
+      }),
+    }));
+    mockQueryGet
+      .mockResolvedValueOnce({ docs: searchResults, empty: false })
+      .mockResolvedValue({ docs: [], empty: true });
+
+    const res = await app.request("/api/novels/trending?search=novel&limit=100");
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data).toMatchObject({ page: 1, limit: 10, total: 11 });
+    expect(body.data.items).toHaveLength(10);
+    expect(body.data.items[0].id).toBe("novel-1");
+    expect(mockCountGet).not.toHaveBeenCalled();
   });
 });
 

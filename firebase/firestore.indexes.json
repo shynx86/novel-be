@@ -44,6 +44,33 @@
       "collectionGroup": "novels",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "views", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "is_featured", "order": "ASCENDING" },
+        { "fieldPath": "views", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "is_featured", "order": "ASCENDING" },
+        { "fieldPath": "views", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "is_featured", "order": "ASCENDING" },
         { "fieldPath": "views", "order": "DESCENDING" }

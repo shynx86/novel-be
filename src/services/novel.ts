@@ -368,18 +368,20 @@ async function searchNovels(params: {
   const { search, filters, orderByField, page, limit } = params;
 
   if (!search) {
-    let query: admin.firestore.Query = db.collection("novels");
+    let query: admin.firestore.Query = db
+      .collection("novels")
+      .where("publication_status", "==", "public");
     for (const f of filters ?? []) {
       query = query.where(f.field, "==", f.value);
     }
     query = query.orderBy(orderByField, "desc");
 
-    const snapshot = await query.get();
-    const allNovels = snapshot.docs
-      .map((doc) => novelDocToData(doc.id, doc.data()))
-      .filter(isPublicNovel);
-    const total = allNovels.length;
-    const novels = allNovels.slice((page - 1) * limit, page * limit);
+    const totalCount = await query.count().get();
+    const total = totalCount.data().count;
+    if (page > 1) query = query.offset((page - 1) * limit);
+
+    const snapshot = await query.limit(limit).get();
+    const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
     const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
     return { items: enriched, page, limit, total };
   }

@@ -150,7 +150,7 @@ Request → CORS → Request Logger → Route Handler → Error Handler → Resp
 
 ## API Routes
 
-All routes prefixed with `/api/`. List endpoints support `page` and `limit` query params (max 100).
+All routes prefixed with `/api/`. List endpoints support `page` and `limit` query params (max 100), except curated lists (`trending`, `featured`, `completed-featured`) which always use a page size of 10.
 
 ### Public
 
@@ -160,7 +160,9 @@ All routes prefixed with `/api/`. List endpoints support `page` and `limit` quer
 | GET | `/api/genres` | List all genres |
 | GET | `/api/search?q=&status=` | Search novels |
 | GET | `/api/novels` | List novels (filters: `status`, `author_id`, `translator_id`, `genre_id`) |
-| GET | `/api/novels/trending` | Trending novels |
+| GET | `/api/novels/trending` | Trending novels (fixed page size: 10) |
+| GET | `/api/novels/featured` | Featured novels (fixed page size: 10) |
+| GET | `/api/novels/completed-featured` | Completed featured novels (fixed page size: 10) |
 | GET | `/api/novels/completed` | Completed novels |
 | GET | `/api/novels/sitemap` | Sitemap data |
 | GET | `/api/novels/by-slug/:slug` | Novel by slug (includes genres, authors, translators) |
