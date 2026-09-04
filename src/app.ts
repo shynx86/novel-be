@@ -22,6 +22,7 @@ app.use(
       "http://localhost:3000",
       "http://localhost:3001",
       "https://novel-fe-six.vercel.app",
+      "https://novel-fe-test-three.vercel.app",
       "https://haonguyet.com",
       "https://www.haonguyet.com",
     ],
