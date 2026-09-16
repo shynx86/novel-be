@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { publicFilterKey } from "../../src/services/novel-list-index.js";
 import { listPublicNovels } from "../../src/services/novel.js";
-import { mockCountGet, mockGetAll, mockQueryGet } from "../__mocks__/firebase-admin.js";
+import {
+  mockCountGet,
+  mockGetAll,
+  mockQueryGet,
+  mockQueryWhere,
+} from "../__mocks__/firebase-admin.js";
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -126,5 +132,26 @@ describe("listPublicNovels", () => {
       translator: { username: "translator" },
     });
     expect(mockCountGet).not.toHaveBeenCalled();
+  });
+
+  it("queries a filtered page before loading novel relations", async () => {
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 1000 }) });
+    mockQueryGet.mockResolvedValue({ docs: [] });
+
+    const result = await listPublicNovels({
+      genre_id: "fantasy",
+      status: "completed",
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.total).toBe(1000);
+    expect(mockQueryWhere).toHaveBeenCalledWith(
+      "public_filter_keys",
+      "array-contains",
+      publicFilterKey({ genreId: "fantasy", status: "completed" }),
+    );
+    expect(mockQueryGet).toHaveBeenCalledTimes(1);
+    expect(mockGetAll).not.toHaveBeenCalled();
   });
 });

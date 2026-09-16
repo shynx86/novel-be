@@ -3,6 +3,7 @@ import type { NovelDocument, PaginatedResult } from "../types/novel.js";
 import { toVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
 import { listGenres } from "./genre.js";
+import { publicFilterKey, searchGram } from "./novel-list-index.js";
 import { enrichNovelsWithRelations } from "./novel.js";
 
 export interface NovelSearchParams {
@@ -23,7 +24,7 @@ export interface NovelSearchResult extends PaginatedResult<NovelDocument> {
   capped: boolean;
 }
 
-const MAX_CANDIDATES = 250;
+const SEARCH_BATCH_SIZE = 100;
 const OPTIONS_CACHE_MS = 5 * 60_000;
 let optionsCache: { expiresAt: number; value: SearchOptions } | null = null;
 
@@ -55,118 +56,148 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
   };
 }
 
-function intersectSets(sets: Set<string>[]): Set<string> | null {
-  if (sets.length === 0) return null;
-  const [smallest, ...rest] = [...sets].sort((left, right) => left.size - right.size);
-  return new Set([...smallest].filter((id) => rest.every((set) => set.has(id))));
+async function* queryPages(
+  query: admin.firestore.Query,
+): AsyncGenerator<admin.firestore.QueryDocumentSnapshot> {
+  let cursor: admin.firestore.QueryDocumentSnapshot | undefined;
+  while (true) {
+    const page = await (cursor ? query.startAfter(cursor) : query).limit(SEARCH_BATCH_SIZE).get();
+    for (const doc of page.docs) yield doc;
+    if (page.docs.length < SEARCH_BATCH_SIZE) break;
+    cursor = page.docs[page.docs.length - 1];
+  }
 }
 
-async function relationCandidateIds(
-  db: admin.firestore.Firestore,
-  params: NovelSearchParams,
-): Promise<Set<string> | null> {
-  const sets: Set<string>[] = [];
-
-  if (params.author) {
-    const slug = toVietnameseSlug(params.author);
-    const authors = await db
-      .collection("authors")
-      .orderBy("slug")
-      .startAt(slug)
-      .endAt(`${slug}\uf8ff`)
-      .limit(20)
-      .get();
-    const authorIds = authors.docs.map((doc) => doc.id);
-    if (authorIds.length === 0) return new Set();
-    const relations = await db
-      .collection("novel_authors")
-      .where("author_id", "in", authorIds)
-      .limit(MAX_CANDIDATES)
-      .get();
-    sets.push(new Set(relations.docs.map((doc) => doc.data().novel_id as string)));
-  }
-
-  if (params.genreId) {
-    const relations = await db
-      .collection("novel_genres")
-      .where("genre_id", "==", params.genreId)
-      .limit(MAX_CANDIDATES)
-      .get();
-    sets.push(new Set(relations.docs.map((doc) => doc.data().novel_id as string)));
-  }
-
-  if (params.translatorId) {
-    const novels = await db
-      .collection("novels")
-      .where("translator_id", "==", params.translatorId)
-      .limit(MAX_CANDIDATES)
-      .get();
-    sets.push(new Set(novels.docs.map((doc) => doc.id)));
-  }
-
-  return intersectSets(sets);
-}
-
-async function loadCandidates(
-  params: NovelSearchParams,
-): Promise<{ items: NovelDocument[]; capped: boolean }> {
-  const db = getFirestore();
-  const relationIds = await relationCandidateIds(db, params);
-
-  if (relationIds !== null) {
-    const ids = [...relationIds].slice(0, MAX_CANDIDATES);
-    if (ids.length === 0) return { items: [], capped: false };
-    const docs = await db.getAll(...ids.map((id) => db.collection("novels").doc(id)));
-    return {
-      items: docs.flatMap((doc) => {
-        const data = doc.data();
-        return doc.exists && data ? [novelDocToData(doc.id, data)] : [];
-      }),
-      capped: relationIds.size > MAX_CANDIDATES,
-    };
-  }
-
-  const snapshot = await db
-    .collection("novels")
-    .where("publication_status", "==", "public")
-    .orderBy("title_lowercase")
-    .limit(MAX_CANDIDATES)
+async function matchingAuthorIds(author: string): Promise<string[]> {
+  const slug = toVietnameseSlug(author);
+  if (!slug) return [];
+  const authors = await getFirestore()
+    .collection("authors")
+    .orderBy("slug")
+    .startAt(slug)
+    .endAt(`${slug}\uf8ff`)
     .get();
-  return {
-    items: snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data())),
-    capped: snapshot.docs.length === MAX_CANDIDATES,
-  };
+  return authors.docs
+    .filter((doc) => toVietnameseSlug(String(doc.data().name || "")).includes(slug))
+    .map((doc) => doc.id);
+}
+
+async function* candidates(
+  params: NovelSearchParams,
+  title: string,
+  authorIds: string[],
+): AsyncGenerator<admin.firestore.QueryDocumentSnapshot> {
+  const db = getFirestore();
+  const novels = db.collection("novels");
+  if (title) {
+    // A gram narrows substring candidates without excluding titles beyond an
+    // arbitrary alphabetic cutoff. Verify the full substring below.
+    yield* queryPages(
+      novels.where("title_grams", "array-contains", searchGram(title)).orderBy("title_lowercase"),
+    );
+    return;
+  }
+
+  const filter = (authorId?: string) =>
+    publicFilterKey({
+      authorId,
+      genreId: params.genreId,
+      translatorId: params.translatorId,
+    });
+  if (params.author) {
+    for (let index = 0; index < authorIds.length; index += 30) {
+      const keys = authorIds.slice(index, index + 30).map(filter);
+      const query =
+        keys.length === 1
+          ? novels.where("public_filter_keys", "array-contains", keys[0])
+          : novels.where("public_filter_keys", "array-contains-any", keys);
+      yield* queryPages(query.orderBy("title_lowercase"));
+    }
+    return;
+  }
+
+  yield* queryPages(
+    novels.where("public_filter_keys", "array-contains", filter()).orderBy("title_lowercase"),
+  );
+}
+
+function compareSearchResults(left: NovelDocument, right: NovelDocument): number {
+  return left.title.localeCompare(right.title, "vi") || left.id.localeCompare(right.id);
+}
+
+function insertRanked(items: NovelDocument[], item: NovelDocument, keep: number): void {
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (compareSearchResults(items[middle], item) <= 0) low = middle + 1;
+    else high = middle;
+  }
+  if (low >= keep) return;
+  items.splice(low, 0, item);
+  if (items.length > keep) items.pop();
 }
 
 export async function searchNovels(params: NovelSearchParams): Promise<NovelSearchResult> {
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 30);
-  const candidates = await loadCandidates(params);
   const title = normalizeSearchText(params.title || "");
   const author = toVietnameseSlug(params.author || "");
-
-  const basicMatches = candidates.items
-    .filter((novel) => novel.publication_status === "public")
-    .filter((novel) => !title || normalizeSearchText(novel.title).includes(title))
-    .filter((novel) => !params.translatorId || novel.translator_id === params.translatorId);
-
-  // Author names require relation reads to verify a match. Otherwise, the relation
-  // candidate query already applied genre/author IDs, so enrich only the visible page.
-  const authorMatches = author
-    ? (await enrichNovelsWithRelations(basicMatches)).filter((novel) =>
-        novel.authors?.some((item) => toVietnameseSlug(item.name).includes(author)),
+  const authorIds = author ? await matchingAuthorIds(author) : [];
+  if (author && authorIds.length === 0) {
+    return { items: [], page, limit, total: 0, capped: false };
+  }
+  if (!title && authorIds.length <= 1) {
+    let query: admin.firestore.Query = getFirestore()
+      .collection("novels")
+      .where(
+        "public_filter_keys",
+        "array-contains",
+        publicFilterKey({
+          authorId: authorIds[0],
+          genreId: params.genreId,
+          translatorId: params.translatorId,
+        }),
       )
-    : basicMatches;
-  const matches = authorMatches.sort((left, right) => left.title.localeCompare(right.title, "vi"));
-  const visible = matches.slice((page - 1) * limit, page * limit);
-  const items = author ? visible : await enrichNovelsWithRelations(visible);
+      .orderBy("title_lowercase");
+    const total = (await query.count().get()).data().count;
+    if (page > 1) query = query.offset((page - 1) * limit);
+    const snapshot = await query.limit(limit).get();
+    const items = await enrichNovelsWithRelations(
+      snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data())),
+    );
+    return { items, page, limit, total, capped: false };
+  }
+  const authorIdSet = new Set(authorIds);
+  const seenIds = author && !title ? new Set<string>() : null;
+  const ranked: NovelDocument[] = [];
+  let total = 0;
+  for await (const doc of candidates(params, title, authorIds)) {
+    if (seenIds?.has(doc.id)) continue;
+    seenIds?.add(doc.id);
+    const data = doc.data();
+    const novel = novelDocToData(doc.id, data);
+    if (novel.publication_status !== "public") continue;
+    if (title && !normalizeSearchText(novel.title).includes(title)) continue;
+    if (params.translatorId && novel.translator_id !== params.translatorId) continue;
+    if (params.genreId && !(data.genre_ids as string[] | undefined)?.includes(params.genreId)) {
+      continue;
+    }
+    if (author && !(data.author_ids as string[] | undefined)?.some((id) => authorIdSet.has(id))) {
+      continue;
+    }
+    total += 1;
+    insertRanked(ranked, novel, page * limit);
+  }
+  const visible = ranked.slice((page - 1) * limit);
+  const items = await enrichNovelsWithRelations(visible);
 
   return {
     items,
     page,
     limit,
-    total: matches.length,
-    capped: candidates.capped,
+    total,
+    capped: false,
   };
 }
 

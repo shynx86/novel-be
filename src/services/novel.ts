@@ -9,6 +9,12 @@ import { ConflictError, NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { assertImmutableSlug, requireVietnameseSlug, toVietnameseSlug } from "../utils/slug.js";
 import { getFirestore } from "./firebase.js";
+import {
+  normalizeNovelTitle,
+  publicFilterKey,
+  publicFilterKeys,
+  titleGrams,
+} from "./novel-list-index.js";
 import { getNovelAuthors, getNovelGenres } from "./novel-relation.js";
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
@@ -43,10 +49,6 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     beta_updated_at: data.beta_updated_at ?? null,
     beta_last_published_at: data.beta_last_published_at ?? null,
   };
-}
-
-function normalizeNovelTitle(title: string): string {
-  return title.trim().toLocaleLowerCase();
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -212,6 +214,9 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
     price: input.price !== undefined ? input.price : null,
     is_featured: false,
     title_lowercase: normalizeNovelTitle(input.title),
+    title_grams: titleGrams(input.title, (input.publication_status || "draft") === "public"),
+    author_ids: [],
+    genre_ids: [],
     created_at: now,
     updated_at: now,
   };
@@ -219,6 +224,7 @@ export async function createNovel(input: NovelCreateInput): Promise<NovelDocumen
   if (input.translator_id) {
     docData.translator_id = input.translator_id;
   }
+  docData.public_filter_keys = publicFilterKeys(docData);
 
   const ref = db.collection("novels").doc(slug);
   await db.runTransaction(async (transaction) => {
@@ -314,30 +320,26 @@ export async function getRelatedNovels(
   const targetGenreId = genreIds[genreIndex];
   if (!targetGenreId) return [];
 
-  // Find other novels that share this genre
-  const novelGenreSnapshot = await db
-    .collection("novel_genres")
-    .where("genre_id", "==", targetGenreId)
-    .get();
-
-  const relatedNovelIds = novelGenreSnapshot.docs
-    .map((d) => d.data().novel_id as string)
-    .filter((id) => id !== novelId);
-
-  if (relatedNovelIds.length === 0) return [];
-
-  // Fetch the related novels
-  const novelRefs = relatedNovelIds.map((id) => db.collection("novels").doc(id));
-  const novelDocs = await db.getAll(...novelRefs);
-
-  return (
-    novelDocs
-      .filter((doc) => doc.exists && doc.data())
-      // biome-ignore lint/style/noNonNullAssertion: filter guarantees data() exists
-      .map((doc) => novelDocToData(doc.id, doc.data()!))
-      .filter(isPublicNovel)
-      .slice(0, limit)
-  );
+  // Public filter keys are maintained on the novel, allowing Firestore to page
+  // matching documents directly instead of reading the entire genre junction.
+  const result: NovelDocument[] = [];
+  const batchSize = Math.min(100, Math.max(20, limit * 2));
+  const baseQuery = db
+    .collection("novels")
+    .where("public_filter_keys", "array-contains", publicFilterKey({ genreId: targetGenreId }))
+    .orderBy("created_at", "desc");
+  let cursor: admin.firestore.QueryDocumentSnapshot | undefined;
+  while (result.length < limit) {
+    const query = cursor ? baseQuery.startAfter(cursor) : baseQuery;
+    const snapshot = await query.limit(batchSize).get();
+    for (const doc of snapshot.docs) {
+      if (doc.id !== novelId) result.push(novelDocToData(doc.id, doc.data()));
+      if (result.length === limit) break;
+    }
+    if (snapshot.docs.length < batchSize || result.length === limit) break;
+    cursor = snapshot.docs[snapshot.docs.length - 1];
+  }
+  return result;
 }
 
 function getOrderByValue(novel: NovelDocument, field: string): string {
@@ -699,45 +701,27 @@ export async function listPublicNovels(params: {
   const limit = Math.min(params.limit || 20, 100);
 
   if (params.author_id || params.genre_id) {
-    const [authorSnapshot, genreSnapshot] = await Promise.all([
-      params.author_id
-        ? db.collection("novel_authors").where("author_id", "==", params.author_id).get()
-        : undefined,
-      params.genre_id
-        ? db.collection("novel_genres").where("genre_id", "==", params.genre_id).get()
-        : undefined,
-    ]);
-    const authorNovelIds = authorSnapshot
-      ? new Set(authorSnapshot.docs.map((doc) => doc.data().novel_id as string))
-      : undefined;
-    const genreNovelIds = genreSnapshot
-      ? new Set(genreSnapshot.docs.map((doc) => doc.data().novel_id as string))
-      : undefined;
-    const matchingNovelIds = [...(authorNovelIds ?? genreNovelIds ?? new Set<string>())].filter(
-      (id) => !genreNovelIds || genreNovelIds.has(id),
+    let query: admin.firestore.Query = db.collection("novels").where(
+      "public_filter_keys",
+      "array-contains",
+      publicFilterKey({
+        status: params.status,
+        translatorId: params.translator_id,
+        authorId: params.author_id,
+        genreId: params.genre_id,
+      }),
     );
-    if (matchingNovelIds.length === 0) return { items: [], page, limit, total: 0 };
-
     const normalizedSearch = params.search?.trim() ? normalizeNovelTitle(params.search) : undefined;
-    const novels = (await getDocumentsByIds(db, "novels", matchingNovelIds))
-      .flatMap((doc) => {
-        const data = doc.data();
-        return doc.exists && data ? [novelDocToData(doc.id, data)] : [];
-      })
-      .filter(
-        (novel) =>
-          isPublicNovel(novel) &&
-          (!params.status || novel.status === params.status) &&
-          (!params.translator_id || novel.translator_id === params.translator_id) &&
-          (!normalizedSearch || normalizeNovelTitle(novel.title).startsWith(normalizedSearch)),
-      )
-      .sort((a, b) =>
-        normalizedSearch
-          ? normalizeNovelTitle(a.title).localeCompare(normalizeNovelTitle(b.title))
-          : b.created_at.localeCompare(a.created_at),
-      );
-    const total = novels.length;
-    const items = novels.slice((page - 1) * limit, page * limit);
+    query = normalizedSearch
+      ? query
+          .orderBy("title_lowercase", "asc")
+          .startAt(normalizedSearch)
+          .endAt(`${normalizedSearch}\uf8ff`)
+      : query.orderBy("created_at", "desc");
+    const total = (await query.count().get()).data().count;
+    if (page > 1) query = query.offset((page - 1) * limit);
+    const snapshot = await query.limit(limit).get();
+    const items = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
     return { items: await enrichNovelsWithRelations(items), page, limit, total };
   }
 
@@ -798,7 +782,11 @@ export async function updateNovel(
 ): Promise<NovelDocument> {
   const db = getFirestore();
 
-  const existing = await getNovel(novelId);
+  const ref = db.collection("novels").doc(novelId);
+  const snapshot = await ref.get();
+  const currentData = snapshot.data();
+  if (!snapshot.exists || !currentData) throw new NotFoundError("Novel not found");
+  const existing = novelDocToData(snapshot.id, currentData);
   if (input.slug !== undefined) assertImmutableSlug(novelId, input.slug);
   const now = new Date().toISOString();
 
@@ -816,7 +804,16 @@ export async function updateNovel(
   if (input.is_featured !== undefined) updates.is_featured = input.is_featured;
   if (input.translator_id !== undefined) updates.translator_id = input.translator_id;
 
-  await db.collection("novels").doc(novelId).update(updates);
+  const nextData = { ...currentData, ...updates };
+  updates.public_filter_keys = publicFilterKeys(nextData);
+  if (input.title !== undefined || input.publication_status !== undefined) {
+    updates.title_grams = titleGrams(
+      String(nextData.title || ""),
+      nextData.publication_status !== "draft",
+    );
+  }
+
+  await ref.update(updates);
   logger.info("Novel updated", { novelId });
 
   return { ...existing, ...updates, updated_at: now } as NovelDocument;
