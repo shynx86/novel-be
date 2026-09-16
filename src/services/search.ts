@@ -142,23 +142,27 @@ export async function searchNovels(params: NovelSearchParams): Promise<NovelSear
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 30);
   const candidates = await loadCandidates(params);
-  const enriched = await enrichNovelsWithRelations(candidates.items);
   const title = normalizeSearchText(params.title || "");
   const author = toVietnameseSlug(params.author || "");
 
-  const matches = enriched
+  const basicMatches = candidates.items
     .filter((novel) => novel.publication_status === "public")
     .filter((novel) => !title || normalizeSearchText(novel.title).includes(title))
-    .filter(
-      (novel) =>
-        !author || novel.authors?.some((item) => toVietnameseSlug(item.name).includes(author)),
-    )
-    .filter((novel) => !params.genreId || novel.genres?.some((item) => item.id === params.genreId))
-    .filter((novel) => !params.translatorId || novel.translator_id === params.translatorId)
-    .sort((left, right) => left.title.localeCompare(right.title, "vi"));
+    .filter((novel) => !params.translatorId || novel.translator_id === params.translatorId);
+
+  // Author names require relation reads to verify a match. Otherwise, the relation
+  // candidate query already applied genre/author IDs, so enrich only the visible page.
+  const authorMatches = author
+    ? (await enrichNovelsWithRelations(basicMatches)).filter((novel) =>
+        novel.authors?.some((item) => toVietnameseSlug(item.name).includes(author)),
+      )
+    : basicMatches;
+  const matches = authorMatches.sort((left, right) => left.title.localeCompare(right.title, "vi"));
+  const visible = matches.slice((page - 1) * limit, page * limit);
+  const items = author ? visible : await enrichNovelsWithRelations(visible);
 
   return {
-    items: matches.slice((page - 1) * limit, page * limit),
+    items,
     page,
     limit,
     total: matches.length,

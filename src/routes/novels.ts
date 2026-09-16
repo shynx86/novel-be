@@ -3,7 +3,12 @@ import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.js";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
-import { getPublicChapter, listChapters, listNewestChapters } from "../services/chapter.js";
+import {
+  getPublicChapter,
+  getPublicChapterContext,
+  listChapters,
+  listNewestChapters,
+} from "../services/chapter.js";
 import { getFirestore } from "../services/firebase.js";
 import {
   enrichNovelWithRelations,
@@ -19,7 +24,7 @@ import {
   listPublicNovels,
 } from "../services/novel.js";
 import { checkSubscriptionAccess, getUserSubscriptionsForNovel } from "../services/subscription.js";
-import { ForbiddenError, UnauthorizedError } from "../utils/errors.js";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "../utils/errors.js";
 import { parsePagination } from "../utils/pagination.js";
 import { comments } from "./comments.js";
 
@@ -144,6 +149,7 @@ novels.get("/:novelId/chapters", optionalAuthMiddleware, async (c) => {
     limit,
     includeContent: false,
     publicOnly: true,
+    novelVerified: true,
   });
 
   // If user is authenticated, annotate with subscription status
@@ -165,6 +171,15 @@ novels.get("/:novelId/chapters", optionalAuthMiddleware, async (c) => {
   }
 
   return c.json({ data: result }, 200);
+});
+
+// GET /api/novels/:novelId/chapters/:index/context
+novels.get("/:novelId/chapters/:index/context", async (c) => {
+  const novelId = c.req.param("novelId");
+  await getPublicNovel(novelId);
+  const context = await getPublicChapterContext(novelId, Number(c.req.param("index")));
+  if (!context) throw new NotFoundError("Chapter not found");
+  return c.json({ data: context }, 200);
 });
 
 // GET /api/novels/:novelId/chapters/:index

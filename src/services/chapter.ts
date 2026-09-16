@@ -185,14 +185,19 @@ export async function getChapterMeta(
 
 export async function listChapters(
   novelId: string,
-  params: { page?: number; limit?: number; includeContent?: boolean; publicOnly?: boolean },
+  params: {
+    page?: number;
+    limit?: number;
+    includeContent?: boolean;
+    publicOnly?: boolean;
+    novelVerified?: boolean;
+  },
 ): Promise<PaginatedResult<Omit<ChapterDocument, "content"> & { content?: string }>> {
   const db = getFirestore();
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 100);
 
-  // Verify novel exists
-  await getNovel(novelId);
+  if (!params.novelVerified) await getNovel(novelId);
 
   let query: admin.firestore.Query = db.collection("novels").doc(novelId).collection("chapters");
 
@@ -263,6 +268,48 @@ export async function listChapters(
     });
 
   return { items: chapters, page, limit, total };
+}
+
+/** Fetch one public chapter's metadata and its neighbors without scanning every page. */
+export async function getPublicChapterContext(
+  novelId: string,
+  index: number,
+): Promise<{
+  chapter: Pick<
+    ChapterDocument,
+    "index" | "title" | "access_type" | "price" | "public_at" | "updated_at"
+  >;
+  previousIndex: number | null;
+  nextIndex: number | null;
+} | null> {
+  if (!Number.isSafeInteger(index) || index < 1) return null;
+
+  const chapters = getFirestore().collection("novels").doc(novelId).collection("chapters");
+  const publicChapters = chapters.where("publication_status", "==", "public");
+  const [currentAndNext, previous] = await Promise.all([
+    publicChapters
+      .orderBy("index", "asc")
+      .startAt(index)
+      .limit(2)
+      .select("index", "title", "access_type", "price", "public_at", "updated_at")
+      .get(),
+    publicChapters.orderBy("index", "desc").startAfter(index).limit(1).select("index").get(),
+  ]);
+
+  const data = currentAndNext.docs[0]?.data();
+  if (!data || data.index !== index) return null;
+  return {
+    chapter: {
+      index: data.index,
+      title: data.title,
+      access_type: data.access_type,
+      price: data.price || 0,
+      public_at: data.public_at ?? data.updated_at,
+      updated_at: data.updated_at,
+    },
+    previousIndex: previous.docs[0]?.data().index ?? null,
+    nextIndex: currentAndNext.docs[1]?.data().index ?? null,
+  };
 }
 
 export async function listNewestChapters(

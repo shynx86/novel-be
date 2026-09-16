@@ -125,6 +125,14 @@
       ]
     },
     {
+      "collectionGroup": "chapters",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publication_status", "order": "ASCENDING" },
+        { "fieldPath": "index", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "novels",
       "queryScope": "COLLECTION",
       "fields": [
@@ -197,5 +205,9 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "chapters", "fieldPath": "content", "indexes": [] },
+    { "collectionGroup": "source_chapters", "fieldPath": "content", "indexes": [] },
+    { "collectionGroup": "beta_chapters", "fieldPath": "content", "indexes": [] }
+  ]
 }

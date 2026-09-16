@@ -7,6 +7,7 @@ import {
   mockQueryGet,
   mockQueryLimit,
   mockQueryOffset,
+  mockQueryOrderBy,
   mockQueryWhere,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
@@ -285,6 +286,39 @@ describe("GET /api/novels/:novelId/chapters", () => {
 });
 
 // ─── GET /api/novels/:novelId/chapters/:index ───────────────────────────
+
+describe("GET /api/novels/:novelId/chapters/:index/context", () => {
+  it("returns only one chapter's metadata and its public neighbors", async () => {
+    mockDocGet.mockResolvedValue({ exists: true, id: "novel-1", data: () => mockNovelDoc });
+    mockQueryGet
+      .mockResolvedValueOnce({
+        docs: [
+          { data: () => ({ ...mockChapters[1], publication_status: "public" }) },
+          { data: () => ({ index: 3 }) },
+        ],
+      })
+      .mockResolvedValueOnce({ docs: [{ data: () => ({ index: 1 }) }] });
+
+    const res = await app.request("/api/novels/novel-1/chapters/2/context");
+    expect(res.status).toBe(200);
+    expect((await res.json()).data).toMatchObject({
+      chapter: { index: 2, title: "Chapter 2" },
+      previousIndex: 1,
+      nextIndex: 3,
+    });
+    expect(mockCountGet).not.toHaveBeenCalled();
+    expect(mockQueryGet).toHaveBeenCalledTimes(2);
+    expect(mockQueryOrderBy).toHaveBeenCalledWith("index", "asc");
+    expect(mockQueryOrderBy).toHaveBeenCalledWith("index", "desc");
+  });
+
+  it("returns 404 when the requested chapter is not public", async () => {
+    mockDocGet.mockResolvedValue({ exists: true, id: "novel-1", data: () => mockNovelDoc });
+    mockQueryGet.mockResolvedValue({ docs: [] });
+    const res = await app.request("/api/novels/novel-1/chapters/2/context");
+    expect(res.status).toBe(404);
+  });
+});
 
 describe("GET /api/novels/:novelId/chapters/:index", () => {
   it("returns 404 for a chapter that is still scheduled", async () => {
