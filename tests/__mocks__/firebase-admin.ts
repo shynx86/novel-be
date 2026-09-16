@@ -105,7 +105,9 @@ function createQueryBuilder() {
     return builder;
   });
   builder.startAt = jest.fn(() => builder);
+  builder.startAfter = jest.fn(() => builder);
   builder.endAt = jest.fn(() => builder);
+  builder.endBefore = jest.fn(() => builder);
   builder.limit = jest.fn((...args: unknown[]) => {
     mockQueryLimit(...args);
     return builder;
@@ -142,7 +144,9 @@ function createCollectionRef(collectionName?: string) {
     where: builder.where,
     orderBy: builder.orderBy,
     startAt: builder.startAt,
+    startAfter: builder.startAfter,
     endAt: builder.endAt,
+    endBefore: builder.endBefore,
     limit: builder.limit,
     offset: builder.offset,
     select: builder.select,

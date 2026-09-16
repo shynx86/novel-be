@@ -382,7 +382,7 @@ async function searchNovels(params: {
 
     const snapshot = await query.limit(limit).get();
     const novels = snapshot.docs.map((doc) => novelDocToData(doc.id, doc.data()));
-    const enriched = await Promise.all(novels.map(enrichNovelWithRelations));
+    const enriched = await enrichNovelsWithRelations(novels);
     return { items: enriched, page, limit, total };
   }
 
@@ -407,7 +407,7 @@ async function searchNovels(params: {
 
   const total = novels.length;
   const paginated = novels.slice((page - 1) * limit, page * limit);
-  const enriched = await Promise.all(paginated.map(enrichNovelWithRelations));
+  const enriched = await enrichNovelsWithRelations(paginated);
   return { items: enriched, page, limit, total };
 }
 
