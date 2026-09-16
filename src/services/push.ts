@@ -5,6 +5,7 @@ import { logger } from "../utils/logger.js";
 import { requireVietnameseSlug } from "../utils/slug.js";
 import { resolveChapterPublication } from "./chapter.js";
 import { getFirestore } from "./firebase.js";
+import { normalizeNovelTitle, publicFilterKeys, titleGrams } from "./novel-list-index.js";
 import { setNovelAuthors, setNovelGenres } from "./novel-relation.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
   const novelData: Record<string, unknown> = {
     slug,
     title: input.title,
-    title_lowercase: input.title.trim().toLocaleLowerCase(),
+    title_lowercase: normalizeNovelTitle(input.title),
     description: input.description ?? "",
     cover_url: input.cover_url ?? "",
     status: mapStatus(input.status),
@@ -89,6 +90,27 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
     novelData.price = null;
     novelData.created_at = now;
   }
+
+  const previousData = existingNovel.data() ?? {};
+  const currentAuthorIds = Array.isArray(previousData.author_ids)
+    ? previousData.author_ids
+    : existingNovel.exists
+      ? (await db.collection("novel_authors").where("novel_id", "==", slug).get()).docs.map(
+          (doc) => doc.data().author_id as string,
+        )
+      : [];
+  const currentGenreIds = Array.isArray(previousData.genre_ids)
+    ? previousData.genre_ids
+    : existingNovel.exists
+      ? (await db.collection("novel_genres").where("novel_id", "==", slug).get()).docs.map(
+          (doc) => doc.data().genre_id as string,
+        )
+      : [];
+  novelData.author_ids = currentAuthorIds;
+  novelData.genre_ids = currentGenreIds;
+  const mergedData = { ...previousData, ...novelData };
+  novelData.public_filter_keys = publicFilterKeys(mergedData);
+  novelData.title_grams = titleGrams(input.title, mergedData.publication_status !== "draft");
 
   await novelRef.set(novelData, { merge: true });
   logger.info("Novel upserted via push", { novelId: slug, title: input.title });

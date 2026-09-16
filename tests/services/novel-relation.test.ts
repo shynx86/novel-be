@@ -1,9 +1,12 @@
 import { jest } from "@jest/globals";
+import { publicFilterKey } from "../../src/services/novel-list-index.js";
 import {
   mockBatchCommit,
   mockBatchDelete,
   mockBatchSet,
+  mockBatchUpdate,
   mockCountGet,
+  mockDocGet,
   mockGetAll,
   mockQueryGet,
 } from "../__mocks__/firebase-admin.js";
@@ -20,6 +23,15 @@ const {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockDocGet.mockResolvedValue({
+    exists: true,
+    data: () => ({
+      publication_status: "public",
+      status: "ongoing",
+      author_ids: [],
+      genre_ids: [],
+    }),
+  });
 });
 
 // ─── setNovelAuthors ────────────────────────────────────────────────────────
@@ -33,6 +45,10 @@ describe("setNovelAuthors", () => {
     await setNovelAuthors("novel-1", ["author-1", "author-2"]);
 
     expect(mockBatchSet).toHaveBeenCalledTimes(2);
+    expect(mockBatchUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ author_ids: ["author-1", "author-2"] }),
+    );
     expect(mockBatchDelete).not.toHaveBeenCalled();
     expect(mockBatchCommit).toHaveBeenCalledTimes(1);
   });
@@ -111,6 +127,31 @@ describe("setNovelGenres", () => {
     // genre-1 removed, genre-3 added, genre-2 unchanged
     expect(mockBatchDelete).toHaveBeenCalledTimes(1);
     expect(mockBatchSet).toHaveBeenCalledTimes(1);
+  });
+
+  it("indexes combined author and genre filters with the relation update", async () => {
+    mockDocGet.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        publication_status: "public",
+        status: "ongoing",
+        author_ids: ["author-1"],
+        genre_ids: [],
+      }),
+    });
+    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
+    mockBatchCommit.mockResolvedValue(undefined);
+
+    await setNovelGenres("novel-1", ["genre-1"]);
+
+    expect(mockBatchUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        public_filter_keys: expect.arrayContaining([
+          publicFilterKey({ authorId: "author-1", genreId: "genre-1" }),
+        ]),
+      }),
+    );
   });
 });
 

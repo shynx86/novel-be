@@ -1,6 +1,30 @@
 {
   "indexes": [
     {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "public_filter_keys", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "public_filter_keys", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "title_lowercase", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "novels",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "title_grams", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "title_lowercase", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "subscriptions",
       "queryScope": "COLLECTION",
       "fields": [
@@ -206,6 +230,10 @@
     }
   ],
   "fieldOverrides": [
+    { "collectionGroup": "novels", "fieldPath": "public_filter_keys", "indexes": [] },
+    { "collectionGroup": "novels", "fieldPath": "title_grams", "indexes": [] },
+    { "collectionGroup": "novels", "fieldPath": "author_ids", "indexes": [] },
+    { "collectionGroup": "novels", "fieldPath": "genre_ids", "indexes": [] },
     { "collectionGroup": "chapters", "fieldPath": "content", "indexes": [] },
     { "collectionGroup": "source_chapters", "fieldPath": "content", "indexes": [] },
     { "collectionGroup": "beta_chapters", "fieldPath": "content", "indexes": [] }

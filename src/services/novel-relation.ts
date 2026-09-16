@@ -2,6 +2,7 @@ import type admin from "firebase-admin";
 import type { NovelAuthorRelation, NovelGenreRelation, PaginatedResult } from "../types/novel.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
+import { publicFilterKeys } from "./novel-list-index.js";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -14,9 +15,19 @@ function junctionDocId(novelId: string, entityId: string): string {
 export async function setNovelAuthors(novelId: string, authorIds: string[]): Promise<void> {
   const db = getFirestore();
   const col = db.collection("novel_authors");
+  const novelRef = db.collection("novels").doc(novelId);
 
   // Get existing
-  const existing = await col.where("novel_id", "==", novelId).get();
+  const [existing, novelDoc] = await Promise.all([
+    col.where("novel_id", "==", novelId).get(),
+    novelRef.get(),
+  ]);
+  const novelData = novelDoc.data() ?? {};
+  const genreIds: string[] = Array.isArray(novelData.genre_ids)
+    ? novelData.genre_ids
+    : (await db.collection("novel_genres").where("novel_id", "==", novelId).get()).docs.map(
+        (doc) => doc.data().genre_id as string,
+      );
   const existingIds = new Set(existing.docs.map((d) => d.data().author_id));
   const newIds = new Set(authorIds);
 
@@ -38,6 +49,17 @@ export async function setNovelAuthors(novelId: string, authorIds: string[]): Pro
     }
   }
 
+  const uniqueAuthorIds = [...new Set(authorIds)];
+  batch.update(novelRef, {
+    author_ids: uniqueAuthorIds,
+    genre_ids: genreIds,
+    public_filter_keys: publicFilterKeys({
+      ...novelData,
+      author_ids: uniqueAuthorIds,
+      genre_ids: genreIds,
+    }),
+  });
+
   await batch.commit();
   logger.info("Novel authors updated", { novelId, authorIds });
 }
@@ -45,8 +67,18 @@ export async function setNovelAuthors(novelId: string, authorIds: string[]): Pro
 export async function setNovelGenres(novelId: string, genreIds: string[]): Promise<void> {
   const db = getFirestore();
   const col = db.collection("novel_genres");
+  const novelRef = db.collection("novels").doc(novelId);
 
-  const existing = await col.where("novel_id", "==", novelId).get();
+  const [existing, novelDoc] = await Promise.all([
+    col.where("novel_id", "==", novelId).get(),
+    novelRef.get(),
+  ]);
+  const novelData = novelDoc.data() ?? {};
+  const authorIds: string[] = Array.isArray(novelData.author_ids)
+    ? novelData.author_ids
+    : (await db.collection("novel_authors").where("novel_id", "==", novelId).get()).docs.map(
+        (doc) => doc.data().author_id as string,
+      );
   const existingIds = new Set(existing.docs.map((d) => d.data().genre_id));
   const newIds = new Set(genreIds);
 
@@ -65,6 +97,17 @@ export async function setNovelGenres(novelId: string, genreIds: string[]): Promi
       batch.set(ref, { novel_id: novelId, genre_id: genreId, created_at: now });
     }
   }
+
+  const uniqueGenreIds = [...new Set(genreIds)];
+  batch.update(novelRef, {
+    author_ids: authorIds,
+    genre_ids: uniqueGenreIds,
+    public_filter_keys: publicFilterKeys({
+      ...novelData,
+      author_ids: authorIds,
+      genre_ids: uniqueGenreIds,
+    }),
+  });
 
   await batch.commit();
   logger.info("Novel genres updated", { novelId, genreIds });
