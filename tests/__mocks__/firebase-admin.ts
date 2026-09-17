@@ -45,7 +45,11 @@ export const mockQueryWhere: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockQueryOrderBy: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockQueryStartAt: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockQueryLimit: any = jest.fn();
+// biome-ignore lint/suspicious/noExplicitAny: mock module
+export const mockQuerySelect: any = jest.fn();
 // biome-ignore lint/suspicious/noExplicitAny: mock module
 export const mockQueryOffset: any = jest.fn();
 
@@ -104,7 +108,10 @@ function createQueryBuilder() {
     mockQueryOrderBy(...args);
     return builder;
   });
-  builder.startAt = jest.fn(() => builder);
+  builder.startAt = jest.fn((...args: unknown[]) => {
+    mockQueryStartAt(...args);
+    return builder;
+  });
   builder.startAfter = jest.fn(() => builder);
   builder.endAt = jest.fn(() => builder);
   builder.endBefore = jest.fn(() => builder);
@@ -116,7 +123,10 @@ function createQueryBuilder() {
     mockQueryOffset(...args);
     return builder;
   });
-  builder.select = jest.fn(() => builder);
+  builder.select = jest.fn((...args: unknown[]) => {
+    mockQuerySelect(...args);
+    return builder;
+  });
   builder.get = mockQueryGet;
   builder.count = jest.fn(() => ({ get: mockCountGet }));
   return builder;

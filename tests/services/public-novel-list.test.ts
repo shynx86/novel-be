@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { publicFilterKey } from "../../src/services/novel-list-index.js";
-import { listPublicNovels } from "../../src/services/novel.js";
+import { listNovelsForSitemap, listPublicNovels } from "../../src/services/novel.js";
 import {
   mockCountGet,
   mockGetAll,
   mockQueryGet,
+  mockQueryLimit,
+  mockQueryOffset,
+  mockQueryOrderBy,
+  mockQuerySelect,
   mockQueryWhere,
 } from "../__mocks__/firebase-admin.js";
 
@@ -82,7 +86,8 @@ describe("listPublicNovels", () => {
     expect(mockGetAll).toHaveBeenCalledTimes(3);
   });
 
-  it("lists a translator portfolio without requiring a composite index", async () => {
+  it("pages a translator portfolio using the public filter index", async () => {
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 21 }) });
     mockQueryGet
       .mockResolvedValueOnce({
         docs: [
@@ -95,17 +100,6 @@ describe("listPublicNovels", () => {
               status: "ongoing",
               translator_id: "translator-1",
               created_at: "2026-08-01T00:00:00.000Z",
-            }),
-          },
-          {
-            id: "draft-novel",
-            data: () => ({
-              slug: "draft-novel",
-              title: "Draft Novel",
-              publication_status: "draft",
-              status: "ongoing",
-              translator_id: "translator-1",
-              created_at: "2026-08-02T00:00:00.000Z",
             }),
           },
         ],
@@ -122,16 +116,24 @@ describe("listPublicNovels", () => {
 
     const result = await listPublicNovels({
       translator_id: "translator-1",
-      page: 1,
+      page: 2,
       limit: 12,
     });
 
-    expect(result.total).toBe(1);
+    expect(result.total).toBe(21);
     expect(result.items[0]).toMatchObject({
       id: "public-novel",
       translator: { username: "translator" },
     });
-    expect(mockCountGet).not.toHaveBeenCalled();
+    expect(mockQueryWhere).toHaveBeenCalledWith(
+      "public_filter_keys",
+      "array-contains",
+      publicFilterKey({ translatorId: "translator-1" }),
+    );
+    expect(mockQueryOrderBy).toHaveBeenCalledWith("created_at", "desc");
+    expect(mockQueryOffset).toHaveBeenCalledWith(12);
+    expect(mockQueryLimit).toHaveBeenCalledWith(12);
+    expect(mockQueryGet).toHaveBeenCalledTimes(3);
   });
 
   it("queries a filtered page before loading novel relations", async () => {
@@ -153,5 +155,53 @@ describe("listPublicNovels", () => {
     );
     expect(mockQueryGet).toHaveBeenCalledTimes(1);
     expect(mockGetAll).not.toHaveBeenCalled();
+  });
+});
+
+describe("listNovelsForSitemap", () => {
+  it("excludes drafts and keeps legacy public novels with the projected fields", async () => {
+    mockQueryGet.mockResolvedValue({
+      docs: [
+        {
+          id: "public-novel",
+          data: () => ({
+            slug: "public-novel",
+            publication_status: "public",
+            public_chapter_count: 2,
+            updated_at: "2026-08-01T00:00:00.000Z",
+          }),
+        },
+        {
+          id: "draft-novel",
+          data: () => ({ slug: "draft-novel", publication_status: "draft" }),
+        },
+        {
+          id: "legacy-novel",
+          data: () => ({ chapter_count: 3, updated_at: "2026-07-01T00:00:00.000Z" }),
+        },
+      ],
+    });
+
+    expect(await listNovelsForSitemap()).toEqual([
+      {
+        id: "public-novel",
+        slug: "public-novel",
+        chapter_count: 2,
+        updated_at: "2026-08-01T00:00:00.000Z",
+      },
+      {
+        id: "legacy-novel",
+        slug: "legacy-novel",
+        chapter_count: 3,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+    ]);
+    expect(mockQuerySelect).toHaveBeenCalledWith(
+      "slug",
+      "chapter_count",
+      "public_chapter_count",
+      "updated_at",
+      "publication_status",
+    );
   });
 });

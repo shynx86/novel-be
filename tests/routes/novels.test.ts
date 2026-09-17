@@ -8,6 +8,7 @@ import {
   mockQueryLimit,
   mockQueryOffset,
   mockQueryOrderBy,
+  mockQueryStartAt,
   mockQueryWhere,
   mockVerifyIdToken,
 } from "../__mocks__/firebase-admin.js";
@@ -160,6 +161,42 @@ describe("curated novel list pagination", () => {
     expect(body.data.items).toHaveLength(10);
     expect(body.data.items[0].id).toBe("novel-1");
     expect(mockCountGet).not.toHaveBeenCalled();
+  });
+
+  it("searches normalized titles and ranks view counts numerically", async () => {
+    mockQueryGet.mockResolvedValueOnce({
+      docs: [
+        {
+          id: "few-views",
+          data: () => ({
+            ...mockNovelDoc,
+            title: "Novel A",
+            publication_status: "public",
+            views: 9,
+          }),
+        },
+        {
+          id: "many-views",
+          data: () => ({
+            ...mockNovelDoc,
+            title: "Novel B",
+            publication_status: "public",
+            views: 100,
+          }),
+        },
+      ],
+    });
+    mockQueryGet.mockResolvedValue({ docs: [] });
+
+    const res = await app.request("/api/novels/trending?search=%20NoVeL%20");
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.items.map((novel: { id: string }) => novel.id)).toEqual([
+      "many-views",
+      "few-views",
+    ]);
+    expect(mockQueryOrderBy).toHaveBeenCalledWith("title_lowercase");
+    expect(mockQueryStartAt).toHaveBeenCalledWith("novel");
   });
 });
 
