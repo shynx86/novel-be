@@ -290,18 +290,20 @@ export async function listNovelsForSitemap(): Promise<
   const db = getFirestore();
   const snapshot = await db
     .collection("novels")
-    .select("slug", "chapter_count", "public_chapter_count", "updated_at")
+    .select("slug", "chapter_count", "public_chapter_count", "updated_at", "publication_status")
     .get();
 
   return snapshot.docs
-    .map((doc) => novelDocToData(doc.id, doc.data()))
-    .filter(isPublicNovel)
-    .map((novel) => ({
-      id: novel.id,
-      slug: novel.slug,
-      chapter_count: novel.public_chapter_count,
-      updated_at: novel.updated_at,
-    }));
+    .filter((doc) => doc.data().publication_status !== "draft")
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        slug: data.slug || doc.id,
+        chapter_count: data.public_chapter_count ?? data.chapter_count ?? 0,
+        updated_at: data.updated_at,
+      };
+    });
 }
 
 export async function getRelatedNovels(
@@ -342,10 +344,10 @@ export async function getRelatedNovels(
   return result;
 }
 
-function getOrderByValue(novel: NovelDocument, field: string): string {
+function getOrderByValue(novel: NovelDocument, field: string): string | number {
   const record = novel as unknown as Record<string, unknown>;
   const val = record[field];
-  return val == null ? "" : String(val);
+  return typeof val === "number" ? val : val == null ? "" : String(val);
 }
 
 function matchesFilters(
@@ -388,10 +390,10 @@ async function searchNovels(params: {
     return { items: enriched, page, limit, total };
   }
 
-  const lowerSearch = search.toLowerCase();
+  const lowerSearch = normalizeNovelTitle(search);
   const query: admin.firestore.Query = db
     .collection("novels")
-    .orderBy("title")
+    .orderBy("title_lowercase")
     .startAt(lowerSearch)
     .endAt(`${lowerSearch}\uf8ff`);
 
@@ -404,7 +406,9 @@ async function searchNovels(params: {
   novels.sort((a, b) => {
     const aVal = getOrderByValue(a, orderByField);
     const bVal = getOrderByValue(b, orderByField);
-    return bVal.localeCompare(aVal);
+    return typeof aVal === "number" && typeof bVal === "number"
+      ? bVal - aVal
+      : String(bVal).localeCompare(String(aVal));
   });
 
   const total = novels.length;
@@ -700,7 +704,7 @@ export async function listPublicNovels(params: {
   const page = params.page || 1;
   const limit = Math.min(params.limit || 20, 100);
 
-  if (params.author_id || params.genre_id) {
+  if (params.author_id || params.genre_id || params.translator_id) {
     let query: admin.firestore.Query = db.collection("novels").where(
       "public_filter_keys",
       "array-contains",
@@ -725,34 +729,11 @@ export async function listPublicNovels(params: {
     return { items: await enrichNovelsWithRelations(items), page, limit, total };
   }
 
-  // A translator profile must remain queryable even when composite indexes have not yet
-  // finished deploying. Translator portfolios are small enough to filter and sort in memory.
-  if (params.translator_id) {
-    const snapshot = await db
-      .collection("novels")
-      .where("translator_id", "==", params.translator_id)
-      .get();
-    const normalizedSearch = params.search?.trim() ? normalizeNovelTitle(params.search) : undefined;
-    const novels = snapshot.docs
-      .map((doc) => novelDocToData(doc.id, doc.data()))
-      .filter(
-        (novel) =>
-          isPublicNovel(novel) &&
-          (!params.status || novel.status === params.status) &&
-          (!normalizedSearch || normalizeNovelTitle(novel.title).startsWith(normalizedSearch)),
-      )
-      .sort((left, right) => right.created_at.localeCompare(left.created_at));
-    const total = novels.length;
-    const items = novels.slice((page - 1) * limit, page * limit);
-    return { items: await enrichNovelsWithRelations(items), page, limit, total };
-  }
-
   let query: admin.firestore.Query = db
     .collection("novels")
     .where("publication_status", "==", "public");
 
   if (params.status) query = query.where("status", "==", params.status);
-  if (params.translator_id) query = query.where("translator_id", "==", params.translator_id);
 
   const search = params.search?.trim();
   if (search) {
