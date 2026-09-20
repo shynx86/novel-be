@@ -37,7 +37,8 @@ describe("searchNovels", () => {
 
     expect(result.total).toBe(2);
     expect(result.items.map((novel) => novel.id)).toEqual(["novel-2"]);
-    expect(mockQueryWhere).toHaveBeenCalledWith("novel_id", "in", ["novel-2"]);
+    expect(mockQueryWhere).toHaveBeenCalledWith("title_grams", "array-contains", "que");
+    expect(mockQueryWhere).not.toHaveBeenCalledWith("novel_id", "in", ["novel-2"]);
   });
 
   it("returns results past the former 250-candidate cutoff", async () => {

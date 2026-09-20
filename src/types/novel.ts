@@ -32,6 +32,8 @@ export interface NovelDocument {
   price: number | null;
   is_featured: boolean;
   translator_id?: string;
+  author_ids: string[];
+  genre_ids: string[];
   created_at: string;
   updated_at: string;
   beta_status?: BetaDashboardStatus;
@@ -265,5 +267,5 @@ export interface PaginatedResult<T> {
   items: T[];
   page: number;
   limit: number;
-  total: number;
+  total: number | null;
 }

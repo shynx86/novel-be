@@ -104,6 +104,8 @@ export async function listFavorites(
               slug: novelData.slug || novelDoc.id,
               price: novelData.price ?? null,
               is_featured: novelData.is_featured ?? false,
+              author_ids: Array.isArray(novelData.author_ids) ? novelData.author_ids : [],
+              genre_ids: Array.isArray(novelData.genre_ids) ? novelData.genre_ids : [],
               created_at: novelData.created_at,
               updated_at: novelData.updated_at,
             }

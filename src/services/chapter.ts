@@ -317,45 +317,62 @@ export async function listNewestChapters(
   search?: string,
 ): Promise<NewestChapterDocument[]> {
   const db = getFirestore();
-  const candidateLimit = Math.min(Math.max(limit * 10, 50), 100);
-  const snapshot = await db
+  const maxCandidates = Math.min(Math.max(limit * 10, 50), 100);
+  const baseQuery = db
     .collectionGroup("chapters")
     .where("publication_status", "==", "public")
     .select("index", "title", "access_type", "price", "public_at", "updated_at")
-    .orderBy("public_at", "desc")
-    .limit(candidateLimit)
-    .get();
+    .orderBy("public_at", "desc");
+  const normalizedSearch = search?.trim().toLocaleLowerCase("vi");
+  const novelsById = new Map<string, admin.firestore.DocumentData | null>();
+  const result: NewestChapterDocument[] = [];
+  let cursor: admin.firestore.QueryDocumentSnapshot | undefined;
+  let scanned = 0;
 
-  const candidates = snapshot.docs
-    .map((doc) => ({ doc, novelId: doc.ref.parent.parent?.id }))
-    .filter(
-      (candidate): candidate is { doc: admin.firestore.QueryDocumentSnapshot; novelId: string } =>
-        Boolean(candidate.novelId),
-    );
-  const uniqueNovelIds = [...new Set(candidates.map((candidate) => candidate.novelId))];
-  const novelDocs = uniqueNovelIds.length
-    ? await db.getAll(...uniqueNovelIds.map((id) => db.collection("novels").doc(id)))
-    : [];
-  const novelsById = new Map(
-    novelDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()]),
-  );
-  const normalizedSearch = search?.trim().toLowerCase();
+  while (result.length < limit && scanned < maxCandidates) {
+    const batchSize = Math.min(limit - result.length, maxCandidates - scanned);
+    const query = cursor ? baseQuery.startAfter(cursor) : baseQuery;
+    const snapshot = await query.limit(batchSize).get();
+    if (snapshot.empty) break;
+    scanned += snapshot.size;
+    cursor = snapshot.docs[snapshot.docs.length - 1];
 
-  return candidates
-    .map(({ doc, novelId }) => {
+    const candidates = snapshot.docs
+      .map((doc) => ({ doc, novelId: doc.ref.parent.parent?.id }))
+      .filter(
+        (candidate): candidate is { doc: admin.firestore.QueryDocumentSnapshot; novelId: string } =>
+          Boolean(candidate.novelId),
+      );
+    const unknownNovelIds = [
+      ...new Set(
+        candidates
+          .map((candidate) => candidate.novelId)
+          .filter((novelId) => !novelsById.has(novelId)),
+      ),
+    ];
+    if (unknownNovelIds.length > 0) {
+      const novelDocs = await db.getAll(
+        ...unknownNovelIds.map((id) => db.collection("novels").doc(id)),
+      );
+      for (const novelDoc of novelDocs) {
+        novelsById.set(novelDoc.id, novelDoc.exists ? (novelDoc.data() ?? null) : null);
+      }
+    }
+
+    for (const { doc, novelId } of candidates) {
       const novel = novelsById.get(novelId);
-      if (!novel || novel.publication_status === "draft") return null;
+      if (!novel || novel.publication_status === "draft") continue;
       if (
         normalizedSearch &&
         !String(novel.title || "")
-          .toLowerCase()
+          .toLocaleLowerCase("vi")
           .includes(normalizedSearch)
       ) {
-        return null;
+        continue;
       }
 
       const chapter = doc.data();
-      return {
+      result.push({
         novel_id: novelId,
         novel_slug: novel.slug || novelId,
         novel_title: novel.title,
@@ -365,10 +382,14 @@ export async function listNewestChapters(
         price: chapter.price || 0,
         public_at: chapter.public_at,
         updated_at: chapter.updated_at,
-      };
-    })
-    .filter((chapter): chapter is NewestChapterDocument => chapter !== null)
-    .slice(0, limit);
+      });
+      if (result.length === limit) break;
+    }
+
+    if (snapshot.size < batchSize) break;
+  }
+
+  return result;
 }
 
 export async function createChapter(

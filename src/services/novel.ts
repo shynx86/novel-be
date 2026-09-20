@@ -15,7 +15,11 @@ import {
   publicFilterKeys,
   titleGrams,
 } from "./novel-list-index.js";
-import { getNovelAuthors, getNovelGenres } from "./novel-relation.js";
+
+function stringIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((id): id is string => typeof id === "string" && Boolean(id)))];
+}
 
 function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDocument {
   return {
@@ -37,6 +41,8 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     price: data.price ?? null,
     is_featured: data.is_featured ?? false,
     translator_id: data.translator_id ?? undefined,
+    author_ids: stringIds(data.author_ids),
+    genre_ids: stringIds(data.genre_ids),
     created_at: data.created_at,
     updated_at: data.updated_at,
     beta_status: data.beta_status === undefined ? "not_started" : data.beta_status,
@@ -73,79 +79,26 @@ async function getDocumentsByIds(
   return snapshots.flat();
 }
 
-async function getRelationsForNovels(
-  db: admin.firestore.Firestore,
-  collection: "novel_authors" | "novel_genres",
-  novelIds: string[],
-): Promise<admin.firestore.QueryDocumentSnapshot[]> {
-  const snapshots = await Promise.all(
-    chunk(novelIds, 30).map((idsChunk) =>
-      db.collection(collection).where("novel_id", "in", idsChunk).get(),
-    ),
-  );
-  return snapshots.flatMap((snapshot) => snapshot.docs);
-}
-
 export async function enrichNovelWithRelations(novel: NovelDocument): Promise<NovelDocument> {
-  const db = getFirestore();
-  const [authors, genres] = await Promise.all([
-    getNovelAuthors(novel.id),
-    getNovelGenres(novel.id),
-  ]);
-
-  let translator: { id: string; name: string; username: string } | undefined;
-  if (novel.translator_id) {
-    try {
-      const userDoc = await db.collection("users").doc(novel.translator_id).get();
-      if (userDoc.exists) {
-        const userData = userDoc.data();
-        translator = {
-          id: novel.translator_id,
-          name: userData?.display_name || userData?.username || "Dịch giả",
-          username: userData?.username || `user_${novel.translator_id}`,
-        };
-      }
-    } catch {
-      // Ignore error if user not found
-    }
-  }
-
-  return {
-    ...novel,
-    authors: authors.map((a) => ({ id: a.author_id, name: a.author_name })),
-    genres: genres.map((g) => ({ id: g.genre_id, name: g.genre_name })),
-    translator,
-  };
+  return (await enrichNovelsWithRelations([novel]))[0];
 }
 
 export async function enrichNovelsWithRelations(novels: NovelDocument[]): Promise<NovelDocument[]> {
   if (novels.length === 0) return [];
 
   const db = getFirestore();
-  const novelIds = novels.map((novel) => novel.id);
-  const [authorRelations, genreRelations] = await Promise.all([
-    getRelationsForNovels(db, "novel_authors", novelIds),
-    getRelationsForNovels(db, "novel_genres", novelIds),
-  ]);
-
-  const authorIdsByNovel = new Map<string, string[]>();
-  const genreIdsByNovel = new Map<string, string[]>();
-  for (const relation of authorRelations) {
-    const data = relation.data();
-    const ids = authorIdsByNovel.get(data.novel_id) ?? [];
-    ids.push(data.author_id);
-    authorIdsByNovel.set(data.novel_id, ids);
-  }
-  for (const relation of genreRelations) {
-    const data = relation.data();
-    const ids = genreIdsByNovel.get(data.novel_id) ?? [];
-    ids.push(data.genre_id);
-    genreIdsByNovel.set(data.novel_id, ids);
-  }
 
   const [authorDocs, genreDocs, translatorDocs] = await Promise.all([
-    getDocumentsByIds(db, "authors", [...authorIdsByNovel.values()].flat()),
-    getDocumentsByIds(db, "genres", [...genreIdsByNovel.values()].flat()),
+    getDocumentsByIds(
+      db,
+      "authors",
+      novels.flatMap((novel) => novel.author_ids),
+    ),
+    getDocumentsByIds(
+      db,
+      "genres",
+      novels.flatMap((novel) => novel.genre_ids),
+    ),
     getDocumentsByIds(
       db,
       "users",
@@ -180,10 +133,10 @@ export async function enrichNovelsWithRelations(novels: NovelDocument[]): Promis
 
   return novels.map((novel) => ({
     ...novel,
-    authors: (authorIdsByNovel.get(novel.id) ?? [])
+    authors: novel.author_ids
       .map((id) => ({ id, name: authorNames.get(id) }))
       .filter((author): author is { id: string; name: string } => Boolean(author.name)),
-    genres: (genreIdsByNovel.get(novel.id) ?? [])
+    genres: novel.genre_ids
       .map((id) => ({ id, name: genreNames.get(id) }))
       .filter((genre): genre is { id: string; name: string } => Boolean(genre.name)),
     ...(novel.translator_id && translators.has(novel.translator_id)
@@ -367,9 +320,10 @@ async function searchNovels(params: {
   orderByField: string;
   page: number;
   limit: number;
+  includeTotal?: boolean;
 }): Promise<PaginatedResult<NovelDocument>> {
   const db = getFirestore();
-  const { search, filters, orderByField, page, limit } = params;
+  const { search, filters, orderByField, page, limit, includeTotal = true } = params;
 
   if (!search) {
     let query: admin.firestore.Query = db
@@ -380,8 +334,7 @@ async function searchNovels(params: {
     }
     query = query.orderBy(orderByField, "desc");
 
-    const totalCount = await query.count().get();
-    const total = totalCount.data().count;
+    const total = includeTotal ? (await query.count().get()).data().count : null;
     if (page > 1) query = query.offset((page - 1) * limit);
 
     const snapshot = await query.limit(limit).get();
@@ -421,8 +374,9 @@ export async function getTrendingNovels(
   page = 1,
   limit = 10,
   search?: string,
+  includeTotal = true,
 ): Promise<PaginatedResult<NovelDocument>> {
-  return searchNovels({ search, orderByField: "views", page, limit });
+  return searchNovels({ search, orderByField: "views", page, limit, includeTotal });
 }
 
 export async function getCompletedNovels(
@@ -443,6 +397,7 @@ export async function getFeaturedNovels(
   page = 1,
   limit = 10,
   search?: string,
+  includeTotal = true,
 ): Promise<PaginatedResult<NovelDocument>> {
   return searchNovels({
     search,
@@ -450,6 +405,7 @@ export async function getFeaturedNovels(
     orderByField: "views",
     page,
     limit,
+    includeTotal,
   });
 }
 
@@ -457,6 +413,7 @@ export async function getCompletedFeaturedNovels(
   page = 1,
   limit = 10,
   search?: string,
+  includeTotal = true,
 ): Promise<PaginatedResult<NovelDocument>> {
   return searchNovels({
     search,
@@ -467,6 +424,7 @@ export async function getCompletedFeaturedNovels(
     orderByField: "views",
     page,
     limit,
+    includeTotal,
   });
 }
 

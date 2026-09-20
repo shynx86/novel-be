@@ -6,7 +6,7 @@ import { requireVietnameseSlug } from "../utils/slug.js";
 import { resolveChapterPublication } from "./chapter.js";
 import { getFirestore } from "./firebase.js";
 import { normalizeNovelTitle, publicFilterKeys, titleGrams } from "./novel-list-index.js";
-import { setNovelAuthors, setNovelGenres } from "./novel-relation.js";
+import { setNovelRelations } from "./novel-relation.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -141,8 +141,6 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
       authorIds.push(authorSlug);
       upsertedAuthors.push({ id: authorSlug, name: author.name });
     }
-
-    await setNovelAuthors(slug, authorIds);
   }
 
   // 3. Upsert genres
@@ -169,9 +167,12 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
       genreIds.push(genreSlug);
       upsertedGenres.push({ id: genreSlug, name: genre.name });
     }
-
-    await setNovelGenres(slug, genreIds);
   }
+
+  await setNovelRelations(slug, {
+    ...(input.authors ? { authorIds } : {}),
+    ...(input.genres ? { genreIds } : {}),
+  });
 
   // Build response novel document
   const novel: NovelDocument = {
@@ -196,6 +197,8 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
     comment_count: (existingNovel.data()?.comment_count as number) ?? 0,
     price: (existingNovel.data()?.price as number | null) ?? null,
     is_featured: (existingNovel.data()?.is_featured as boolean) ?? false,
+    author_ids: input.authors ? authorIds : currentAuthorIds,
+    genre_ids: input.genres ? genreIds : currentGenreIds,
     created_at: (existingNovel.data()?.created_at as string) ?? now,
     updated_at: now,
   };

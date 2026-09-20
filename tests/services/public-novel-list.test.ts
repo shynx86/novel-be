@@ -19,42 +19,33 @@ beforeEach(() => {
 describe("listPublicNovels", () => {
   it("uses paged public-novel results and batches relation enrichment", async () => {
     mockCountGet.mockResolvedValue({ data: () => ({ count: 2 }) });
-    mockQueryGet
-      .mockResolvedValueOnce({
-        docs: [
-          {
-            id: "novel-1",
-            data: () => ({
-              title: "First Novel",
-              publication_status: "public",
-              status: "ongoing",
-              created_at: "2026-07-19T00:00:00.000Z",
-            }),
-          },
-          {
-            id: "novel-2",
-            data: () => ({
-              title: "Second Novel",
-              publication_status: "public",
-              status: "ongoing",
-              translator_id: "translator-1",
-              created_at: "2026-07-18T00:00:00.000Z",
-            }),
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        docs: [
-          { data: () => ({ novel_id: "novel-1", author_id: "author-1" }) },
-          { data: () => ({ novel_id: "novel-2", author_id: "author-2" }) },
-        ],
-      })
-      .mockResolvedValueOnce({
-        docs: [
-          { data: () => ({ novel_id: "novel-1", genre_id: "genre-1" }) },
-          { data: () => ({ novel_id: "novel-2", genre_id: "genre-2" }) },
-        ],
-      });
+    mockQueryGet.mockResolvedValueOnce({
+      docs: [
+        {
+          id: "novel-1",
+          data: () => ({
+            title: "First Novel",
+            publication_status: "public",
+            status: "ongoing",
+            author_ids: ["author-1"],
+            genre_ids: ["genre-1"],
+            created_at: "2026-07-19T00:00:00.000Z",
+          }),
+        },
+        {
+          id: "novel-2",
+          data: () => ({
+            title: "Second Novel",
+            publication_status: "public",
+            status: "ongoing",
+            translator_id: "translator-1",
+            author_ids: ["author-2"],
+            genre_ids: ["genre-2"],
+            created_at: "2026-07-18T00:00:00.000Z",
+          }),
+        },
+      ],
+    });
     mockGetAll
       .mockResolvedValueOnce([
         { exists: true, id: "author-1", data: () => ({ name: "Author One" }) },
@@ -82,30 +73,29 @@ describe("listPublicNovels", () => {
         },
       }),
     ]);
-    expect(mockQueryGet).toHaveBeenCalledTimes(3);
+    expect(mockQueryGet).toHaveBeenCalledTimes(1);
     expect(mockGetAll).toHaveBeenCalledTimes(3);
   });
 
   it("pages a translator portfolio using the public filter index", async () => {
     mockCountGet.mockResolvedValue({ data: () => ({ count: 21 }) });
-    mockQueryGet
-      .mockResolvedValueOnce({
-        docs: [
-          {
-            id: "public-novel",
-            data: () => ({
-              slug: "public-novel",
-              title: "Public Novel",
-              publication_status: "public",
-              status: "ongoing",
-              translator_id: "translator-1",
-              created_at: "2026-08-01T00:00:00.000Z",
-            }),
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ docs: [] })
-      .mockResolvedValueOnce({ docs: [] });
+    mockQueryGet.mockResolvedValueOnce({
+      docs: [
+        {
+          id: "public-novel",
+          data: () => ({
+            slug: "public-novel",
+            title: "Public Novel",
+            publication_status: "public",
+            status: "ongoing",
+            translator_id: "translator-1",
+            author_ids: [],
+            genre_ids: [],
+            created_at: "2026-08-01T00:00:00.000Z",
+          }),
+        },
+      ],
+    });
     mockGetAll.mockResolvedValueOnce([
       {
         exists: true,
@@ -133,7 +123,7 @@ describe("listPublicNovels", () => {
     expect(mockQueryOrderBy).toHaveBeenCalledWith("created_at", "desc");
     expect(mockQueryOffset).toHaveBeenCalledWith(12);
     expect(mockQueryLimit).toHaveBeenCalledWith(12);
-    expect(mockQueryGet).toHaveBeenCalledTimes(3);
+    expect(mockQueryGet).toHaveBeenCalledTimes(1);
   });
 
   it("queries a filtered page before loading novel relations", async () => {

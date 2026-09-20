@@ -51,6 +51,8 @@ function novelDocToData(id: string, data: admin.firestore.DocumentData): NovelDo
     price: data.price ?? null,
     is_featured: data.is_featured ?? false,
     translator_id: data.translator_id ?? undefined,
+    author_ids: Array.isArray(data.author_ids) ? data.author_ids : [],
+    genre_ids: Array.isArray(data.genre_ids) ? data.genre_ids : [],
     created_at: data.created_at ?? "",
     updated_at: data.updated_at ?? "",
   };
