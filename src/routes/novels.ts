@@ -46,7 +46,12 @@ novels.get("/sitemap", async (c) => {
 novels.get("/trending", async (c) => {
   const { page } = parsePagination(c.req.query("page"), undefined, CURATED_NOVEL_PAGE_SIZE);
   const search = c.req.query("search") || undefined;
-  const result = await getTrendingNovels(page, CURATED_NOVEL_PAGE_SIZE, search);
+  const result = await getTrendingNovels(
+    page,
+    CURATED_NOVEL_PAGE_SIZE,
+    search,
+    c.req.query("include_total") !== "false",
+  );
   return c.json({ data: result }, 200);
 });
 
@@ -62,7 +67,12 @@ novels.get("/completed", async (c) => {
 novels.get("/featured", async (c) => {
   const { page } = parsePagination(c.req.query("page"), undefined, CURATED_NOVEL_PAGE_SIZE);
   const search = c.req.query("search") || undefined;
-  const result = await getFeaturedNovels(page, CURATED_NOVEL_PAGE_SIZE, search);
+  const result = await getFeaturedNovels(
+    page,
+    CURATED_NOVEL_PAGE_SIZE,
+    search,
+    c.req.query("include_total") !== "false",
+  );
   return c.json({ data: result }, 200);
 });
 
@@ -70,7 +80,12 @@ novels.get("/featured", async (c) => {
 novels.get("/completed-featured", async (c) => {
   const { page } = parsePagination(c.req.query("page"), undefined, CURATED_NOVEL_PAGE_SIZE);
   const search = c.req.query("search") || undefined;
-  const result = await getCompletedFeaturedNovels(page, CURATED_NOVEL_PAGE_SIZE, search);
+  const result = await getCompletedFeaturedNovels(
+    page,
+    CURATED_NOVEL_PAGE_SIZE,
+    search,
+    c.req.query("include_total") !== "false",
+  );
   return c.json({ data: result }, 200);
 });
 
@@ -188,7 +203,7 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
   const index = Number(c.req.param("index"));
   const userId = c.get("userId") as string | undefined;
 
-  await getPublicNovel(novelId);
+  const novel = await getPublicNovel(novelId);
   const chapter = await getPublicChapter(novelId, index);
 
   switch (chapter.access_type) {
@@ -208,7 +223,6 @@ novels.get("/:novelId/chapters/:index", optionalAuthMiddleware, async (c) => {
 
       const hasAccess = await checkSubscriptionAccess(userId, novelId, index);
       if (!hasAccess) {
-        const novel = await getPublicNovel(novelId);
         throw new ForbiddenError("You have not subscribed to this chapter", {
           chapter_price: chapter.price,
           novel_price: novel.price,

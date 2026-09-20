@@ -13,18 +13,24 @@ const chapterSnapshot = (novelId: string, index: number, updatedAt: string) => (
   }),
 });
 
+const querySnapshot = (docs: ReturnType<typeof chapterSnapshot>[]) => ({
+  docs,
+  size: docs.length,
+  empty: docs.length === 0,
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 describe("listNewestChapters", () => {
   it("uses one collection-group query and omits draft novels", async () => {
-    mockQueryGet.mockResolvedValue({
-      docs: [
+    mockQueryGet.mockResolvedValue(
+      querySnapshot([
         chapterSnapshot("published-novel", 5, "2026-07-19T00:00:00.000Z"),
         chapterSnapshot("draft-novel", 4, "2026-07-18T00:00:00.000Z"),
-      ],
-    });
+      ]),
+    );
     mockGetAll.mockResolvedValue([
       {
         exists: true,
@@ -60,9 +66,9 @@ describe("listNewestChapters", () => {
   });
 
   it("filters results by novel title when searching", async () => {
-    mockQueryGet.mockResolvedValue({
-      docs: [chapterSnapshot("novel-1", 1, "2026-07-19T00:00:00.000Z")],
-    });
+    mockQueryGet.mockResolvedValue(
+      querySnapshot([chapterSnapshot("novel-1", 1, "2026-07-19T00:00:00.000Z")]),
+    );
     mockGetAll.mockResolvedValue([
       {
         exists: true,
@@ -76,5 +82,39 @@ describe("listNewestChapters", () => {
     ]);
 
     expect(await listNewestChapters(10, "mystery")).toEqual([]);
+  });
+
+  it("continues from the query cursor until it finds public novels", async () => {
+    const draftChapters = Array.from({ length: 10 }, (_, index) =>
+      chapterSnapshot("draft-novel", index + 1, `2026-07-${20 - index}T00:00:00.000Z`),
+    );
+    mockQueryGet
+      .mockResolvedValueOnce(querySnapshot(draftChapters))
+      .mockResolvedValueOnce(
+        querySnapshot([chapterSnapshot("published-novel", 1, "2026-07-01T00:00:00.000Z")]),
+      );
+    mockGetAll
+      .mockResolvedValueOnce([
+        {
+          exists: true,
+          id: "draft-novel",
+          data: () => ({ title: "Draft", publication_status: "draft" }),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          exists: true,
+          id: "published-novel",
+          data: () => ({ title: "Published", publication_status: "public" }),
+        },
+      ]);
+
+    const result = await listNewestChapters(10);
+
+    expect(result).toEqual([
+      expect.objectContaining({ novel_id: "published-novel", novel_title: "Published" }),
+    ]);
+    expect(mockQueryGet).toHaveBeenCalledTimes(2);
+    expect(mockGetAll).toHaveBeenCalledTimes(2);
   });
 });

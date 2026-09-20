@@ -1,14 +1,13 @@
 import { jest } from "@jest/globals";
 import { publicFilterKey } from "../../src/services/novel-list-index.js";
 import {
-  mockBatchCommit,
-  mockBatchDelete,
-  mockBatchSet,
-  mockBatchUpdate,
   mockCountGet,
-  mockDocGet,
   mockGetAll,
   mockQueryGet,
+  mockTransactionDelete,
+  mockTransactionGet,
+  mockTransactionSet,
+  mockTransactionUpdate,
 } from "../__mocks__/firebase-admin.js";
 
 // Must import after mocks are set up
@@ -23,7 +22,8 @@ const {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockDocGet.mockResolvedValue({
+  mockTransactionGet.mockReset();
+  mockTransactionGet.mockResolvedValueOnce({
     exists: true,
     data: () => ({
       publication_status: "public",
@@ -39,63 +39,72 @@ beforeEach(() => {
 describe("setNovelAuthors", () => {
   it("creates junction docs for new author ids", async () => {
     // Existing relations query → empty
-    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
-    mockBatchCommit.mockResolvedValue(undefined);
+    mockTransactionGet.mockResolvedValueOnce({ docs: [], empty: true });
 
     await setNovelAuthors("novel-1", ["author-1", "author-2"]);
 
-    expect(mockBatchSet).toHaveBeenCalledTimes(2);
-    expect(mockBatchUpdate).toHaveBeenCalledWith(
+    expect(mockTransactionSet).toHaveBeenCalledTimes(2);
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ author_ids: ["author-1", "author-2"] }),
     );
-    expect(mockBatchDelete).not.toHaveBeenCalled();
-    expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    expect(mockTransactionDelete).not.toHaveBeenCalled();
   });
 
   it("removes relations for author ids not in new list", async () => {
     // Existing relations: author-1, author-2
-    mockQueryGet.mockResolvedValue({
+    mockTransactionGet.mockResolvedValueOnce({
       docs: [
         { data: () => ({ author_id: "author-1" }), ref: { id: "novel-1:author-1" } },
         { data: () => ({ author_id: "author-2" }), ref: { id: "novel-1:author-2" } },
       ],
       empty: false,
     });
-    mockBatchCommit.mockResolvedValue(undefined);
-
     // Replace with only author-1
     await setNovelAuthors("novel-1", ["author-1"]);
 
-    expect(mockBatchDelete).toHaveBeenCalledTimes(1);
-    expect(mockBatchSet).not.toHaveBeenCalled();
-    expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    expect(mockTransactionDelete).toHaveBeenCalledTimes(1);
+    expect(mockTransactionSet).not.toHaveBeenCalled();
   });
 
   it("does nothing when new list matches existing", async () => {
-    mockQueryGet.mockResolvedValue({
+    mockTransactionGet.mockResolvedValueOnce({
       docs: [{ data: () => ({ author_id: "author-1" }), ref: { id: "novel-1:author-1" } }],
       empty: false,
     });
-    mockBatchCommit.mockResolvedValue(undefined);
-
     await setNovelAuthors("novel-1", ["author-1"]);
 
-    expect(mockBatchDelete).not.toHaveBeenCalled();
-    expect(mockBatchSet).not.toHaveBeenCalled();
+    expect(mockTransactionDelete).not.toHaveBeenCalled();
+    expect(mockTransactionSet).not.toHaveBeenCalled();
   });
 
   it("clears all relations when empty array provided", async () => {
-    mockQueryGet.mockResolvedValue({
+    mockTransactionGet.mockResolvedValueOnce({
       docs: [{ data: () => ({ author_id: "author-1" }), ref: { id: "novel-1:author-1" } }],
       empty: false,
     });
-    mockBatchCommit.mockResolvedValue(undefined);
-
     await setNovelAuthors("novel-1", []);
 
-    expect(mockBatchDelete).toHaveBeenCalledTimes(1);
-    expect(mockBatchSet).not.toHaveBeenCalled();
+    expect(mockTransactionDelete).toHaveBeenCalledTimes(1);
+    expect(mockTransactionSet).not.toHaveBeenCalled();
+  });
+
+  it("preserves legacy genre ids while adding the denormalized relation arrays", async () => {
+    mockTransactionGet.mockReset();
+    mockTransactionGet.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({ publication_status: "public", status: "ongoing" }),
+    });
+    mockTransactionGet.mockResolvedValueOnce({ docs: [], empty: true }).mockResolvedValueOnce({
+      docs: [{ data: () => ({ genre_id: "genre-1" }) }],
+      empty: false,
+    });
+    await setNovelAuthors("novel-1", ["author-1"]);
+
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ author_ids: ["author-1"], genre_ids: ["genre-1"] }),
+    );
   });
 });
 
@@ -103,34 +112,31 @@ describe("setNovelAuthors", () => {
 
 describe("setNovelGenres", () => {
   it("creates junction docs for new genre ids", async () => {
-    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
-    mockBatchCommit.mockResolvedValue(undefined);
+    mockTransactionGet.mockResolvedValueOnce({ docs: [], empty: true });
 
     await setNovelGenres("novel-1", ["genre-1", "genre-2", "genre-3"]);
 
-    expect(mockBatchSet).toHaveBeenCalledTimes(3);
-    expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    expect(mockTransactionSet).toHaveBeenCalledTimes(3);
   });
 
   it("replaces all relations when list changes", async () => {
-    mockQueryGet.mockResolvedValue({
+    mockTransactionGet.mockResolvedValueOnce({
       docs: [
         { data: () => ({ genre_id: "genre-1" }), ref: { id: "novel-1:genre-1" } },
         { data: () => ({ genre_id: "genre-2" }), ref: { id: "novel-1:genre-2" } },
       ],
       empty: false,
     });
-    mockBatchCommit.mockResolvedValue(undefined);
-
     await setNovelGenres("novel-1", ["genre-2", "genre-3"]);
 
     // genre-1 removed, genre-3 added, genre-2 unchanged
-    expect(mockBatchDelete).toHaveBeenCalledTimes(1);
-    expect(mockBatchSet).toHaveBeenCalledTimes(1);
+    expect(mockTransactionDelete).toHaveBeenCalledTimes(1);
+    expect(mockTransactionSet).toHaveBeenCalledTimes(1);
   });
 
   it("indexes combined author and genre filters with the relation update", async () => {
-    mockDocGet.mockResolvedValue({
+    mockTransactionGet.mockReset();
+    mockTransactionGet.mockResolvedValueOnce({
       exists: true,
       data: () => ({
         publication_status: "public",
@@ -139,12 +145,11 @@ describe("setNovelGenres", () => {
         genre_ids: [],
       }),
     });
-    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
-    mockBatchCommit.mockResolvedValue(undefined);
+    mockTransactionGet.mockResolvedValueOnce({ docs: [], empty: true });
 
     await setNovelGenres("novel-1", ["genre-1"]);
 
-    expect(mockBatchUpdate).toHaveBeenCalledWith(
+    expect(mockTransactionUpdate).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         public_filter_keys: expect.arrayContaining([

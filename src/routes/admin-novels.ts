@@ -15,7 +15,7 @@ import {
   listChapters,
   updateChapter,
 } from "../services/chapter.js";
-import { setNovelAuthors, setNovelGenres } from "../services/novel-relation.js";
+import { setNovelRelations } from "../services/novel-relation.js";
 import {
   createNovel,
   deleteNovel,
@@ -91,13 +91,10 @@ adminNovels.post("/", requirePermission("novels.create"), async (c) => {
     translator_id: translatorId,
   });
 
-  // Set relations if provided
-  if (Array.isArray(body.author_ids)) {
-    await setNovelAuthors(novel.id, body.author_ids);
-  }
-  if (Array.isArray(body.genre_ids)) {
-    await setNovelGenres(novel.id, body.genre_ids);
-  }
+  await setNovelRelations(novel.id, {
+    ...(Array.isArray(body.author_ids) ? { authorIds: body.author_ids } : {}),
+    ...(Array.isArray(body.genre_ids) ? { genreIds: body.genre_ids } : {}),
+  });
 
   return c.json({ data: novel }, 201);
 });
@@ -198,13 +195,10 @@ adminNovels.patch("/:novelId", async (c) => {
 
   const novel = await updateNovel(novelId, updateData);
 
-  // Update relations if provided
-  if (Array.isArray(body.author_ids)) {
-    await setNovelAuthors(novelId, body.author_ids);
-  }
-  if (Array.isArray(body.genre_ids)) {
-    await setNovelGenres(novelId, body.genre_ids);
-  }
+  await setNovelRelations(novelId, {
+    ...(Array.isArray(body.author_ids) ? { authorIds: body.author_ids } : {}),
+    ...(Array.isArray(body.genre_ids) ? { genreIds: body.genre_ids } : {}),
+  });
 
   return c.json({ data: novel }, 200);
 });

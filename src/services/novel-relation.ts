@@ -1,5 +1,6 @@
 import type admin from "firebase-admin";
 import type { NovelAuthorRelation, NovelGenreRelation, PaginatedResult } from "../types/novel.js";
+import { NotFoundError } from "../utils/errors.js";
 import { logger } from "../utils/logger.js";
 import { getFirestore } from "./firebase.js";
 import { publicFilterKeys } from "./novel-list-index.js";
@@ -12,105 +13,108 @@ function junctionDocId(novelId: string, entityId: string): string {
 
 // ─── Set relations (atomic replace) ─────────────────────────────────────────
 
-export async function setNovelAuthors(novelId: string, authorIds: string[]): Promise<void> {
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
+export async function setNovelRelations(
+  novelId: string,
+  input: { authorIds?: string[]; genreIds?: string[] },
+): Promise<void> {
+  if (input.authorIds === undefined && input.genreIds === undefined) return;
+
   const db = getFirestore();
-  const col = db.collection("novel_authors");
   const novelRef = db.collection("novels").doc(novelId);
+  const authorCollection = db.collection("novel_authors");
+  const genreCollection = db.collection("novel_genres");
+  const result = await db.runTransaction(async (transaction) => {
+    const novelDoc = await transaction.get(novelRef);
+    if (!novelDoc.exists) throw new NotFoundError("Novel not found");
+    const novelData = novelDoc.data() ?? {};
+    const hasStoredAuthorIds = Array.isArray(novelData.author_ids);
+    const hasStoredGenreIds = Array.isArray(novelData.genre_ids);
+    const [existingAuthors, existingGenres] = await Promise.all([
+      input.authorIds !== undefined || !hasStoredAuthorIds
+        ? transaction.get(authorCollection.where("novel_id", "==", novelId))
+        : Promise.resolve(null),
+      input.genreIds !== undefined || !hasStoredGenreIds
+        ? transaction.get(genreCollection.where("novel_id", "==", novelId))
+        : Promise.resolve(null),
+    ]);
+    const authorIds = uniqueIds(
+      input.authorIds ??
+        (hasStoredAuthorIds
+          ? (novelData.author_ids as unknown[]).filter(
+              (id: unknown): id is string => typeof id === "string",
+            )
+          : (existingAuthors?.docs.map((doc) => doc.data().author_id as string) ?? [])),
+    );
+    const genreIds = uniqueIds(
+      input.genreIds ??
+        (hasStoredGenreIds
+          ? (novelData.genre_ids as unknown[]).filter(
+              (id: unknown): id is string => typeof id === "string",
+            )
+          : (existingGenres?.docs.map((doc) => doc.data().genre_id as string) ?? [])),
+    );
+    const now = new Date().toISOString();
 
-  // Get existing
-  const [existing, novelDoc] = await Promise.all([
-    col.where("novel_id", "==", novelId).get(),
-    novelRef.get(),
-  ]);
-  const novelData = novelDoc.data() ?? {};
-  const genreIds: string[] = Array.isArray(novelData.genre_ids)
-    ? novelData.genre_ids
-    : (await db.collection("novel_genres").where("novel_id", "==", novelId).get()).docs.map(
-        (doc) => doc.data().genre_id as string,
+    if (existingAuthors && input.authorIds !== undefined) {
+      const previousIds = new Set(
+        existingAuthors.docs.map((doc) => doc.data().author_id as string),
       );
-  const existingIds = new Set(existing.docs.map((d) => d.data().author_id));
-  const newIds = new Set(authorIds);
-
-  const batch = db.batch();
-  const now = new Date().toISOString();
-
-  // Delete removed
-  for (const doc of existing.docs) {
-    if (!newIds.has(doc.data().author_id)) {
-      batch.delete(doc.ref);
+      const nextIds = new Set(authorIds);
+      for (const doc of existingAuthors.docs) {
+        if (!nextIds.has(doc.data().author_id)) transaction.delete(doc.ref);
+      }
+      for (const authorId of authorIds) {
+        if (!previousIds.has(authorId)) {
+          transaction.set(authorCollection.doc(junctionDocId(novelId, authorId)), {
+            novel_id: novelId,
+            author_id: authorId,
+            created_at: now,
+          });
+        }
+      }
     }
-  }
 
-  // Create new
-  for (const authorId of authorIds) {
-    if (!existingIds.has(authorId)) {
-      const ref = col.doc(junctionDocId(novelId, authorId));
-      batch.set(ref, { novel_id: novelId, author_id: authorId, created_at: now });
+    if (existingGenres && input.genreIds !== undefined) {
+      const previousIds = new Set(existingGenres.docs.map((doc) => doc.data().genre_id as string));
+      const nextIds = new Set(genreIds);
+      for (const doc of existingGenres.docs) {
+        if (!nextIds.has(doc.data().genre_id)) transaction.delete(doc.ref);
+      }
+      for (const genreId of genreIds) {
+        if (!previousIds.has(genreId)) {
+          transaction.set(genreCollection.doc(junctionDocId(novelId, genreId)), {
+            novel_id: novelId,
+            genre_id: genreId,
+            created_at: now,
+          });
+        }
+      }
     }
-  }
 
-  const uniqueAuthorIds = [...new Set(authorIds)];
-  batch.update(novelRef, {
-    author_ids: uniqueAuthorIds,
-    genre_ids: genreIds,
-    public_filter_keys: publicFilterKeys({
-      ...novelData,
-      author_ids: uniqueAuthorIds,
+    transaction.update(novelRef, {
+      author_ids: authorIds,
       genre_ids: genreIds,
-    }),
+      public_filter_keys: publicFilterKeys({
+        ...novelData,
+        author_ids: authorIds,
+        genre_ids: genreIds,
+      }),
+    });
+    return { authorIds, genreIds };
   });
+  logger.info("Novel relations updated", { novelId, ...result });
+}
 
-  await batch.commit();
-  logger.info("Novel authors updated", { novelId, authorIds });
+export async function setNovelAuthors(novelId: string, authorIds: string[]): Promise<void> {
+  await setNovelRelations(novelId, { authorIds });
 }
 
 export async function setNovelGenres(novelId: string, genreIds: string[]): Promise<void> {
-  const db = getFirestore();
-  const col = db.collection("novel_genres");
-  const novelRef = db.collection("novels").doc(novelId);
-
-  const [existing, novelDoc] = await Promise.all([
-    col.where("novel_id", "==", novelId).get(),
-    novelRef.get(),
-  ]);
-  const novelData = novelDoc.data() ?? {};
-  const authorIds: string[] = Array.isArray(novelData.author_ids)
-    ? novelData.author_ids
-    : (await db.collection("novel_authors").where("novel_id", "==", novelId).get()).docs.map(
-        (doc) => doc.data().author_id as string,
-      );
-  const existingIds = new Set(existing.docs.map((d) => d.data().genre_id));
-  const newIds = new Set(genreIds);
-
-  const batch = db.batch();
-  const now = new Date().toISOString();
-
-  for (const doc of existing.docs) {
-    if (!newIds.has(doc.data().genre_id)) {
-      batch.delete(doc.ref);
-    }
-  }
-
-  for (const genreId of genreIds) {
-    if (!existingIds.has(genreId)) {
-      const ref = col.doc(junctionDocId(novelId, genreId));
-      batch.set(ref, { novel_id: novelId, genre_id: genreId, created_at: now });
-    }
-  }
-
-  const uniqueGenreIds = [...new Set(genreIds)];
-  batch.update(novelRef, {
-    author_ids: authorIds,
-    genre_ids: uniqueGenreIds,
-    public_filter_keys: publicFilterKeys({
-      ...novelData,
-      author_ids: authorIds,
-      genre_ids: uniqueGenreIds,
-    }),
-  });
-
-  await batch.commit();
-  logger.info("Novel genres updated", { novelId, genreIds });
+  await setNovelRelations(novelId, { genreIds });
 }
 
 // ─── Get relations (resolved with names) ────────────────────────────────────
