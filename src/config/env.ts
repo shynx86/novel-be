@@ -22,6 +22,8 @@ export const env = {
   projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.PROJECT_ID || "",
   firebaseApiKey: process.env.WEB_API_KEY || "",
   firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID || "",
+  frontendRevalidationUrl: process.env.FRONTEND_REVALIDATION_URL || "",
+  cacheRevalidationSecret: process.env.CACHE_REVALIDATION_SECRET || "",
   version: process.env.npm_package_version || "1.0.0",
   deepSeekApiKey: process.env.DEEPSEEK_API_KEY || "",
   deepSeekBaseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
