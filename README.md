@@ -60,6 +60,31 @@ Request → CORS → Request Logger → Route Handler → Error Handler → Resp
                       (none)  (JWT verify) (role check)
 ```
 
+## Frontend cache coordination
+
+Genre responses are cached at two separate layers:
+
+- Public API responses include shared-cache headers: genres use a 24-hour TTL, genre-filtered
+  novel lists use a 2-hour TTL, and searches within a genre use a 5-minute TTL.
+- The Next.js frontend also stores these responses in its Data Cache. This cache is separate from
+  Firebase Cloud Functions and is not automatically invalidated when Firestore changes.
+
+After a successful genre, novel, chapter, or data-push admin mutation, the cache invalidation
+middleware calls the frontend's authenticated revalidation endpoint. Configure:
+
+```env
+FRONTEND_REVALIDATION_URL=https://haonguyet.com/api/cache/revalidate
+CACHE_REVALIDATION_SECRET=<shared-random-secret>
+```
+
+`CACHE_REVALIDATION_SECRET` must match the frontend value. The secret prevents unauthenticated
+callers from repeatedly purging the cache and causing extra Firestore reads. Do not expose it as a
+public client environment variable.
+
+Both settings are optional for local development. When either setting is absent, the callback is a
+no-op and admin mutations still succeed; cached data refreshes naturally when its TTL expires.
+Callback failures are logged and do not roll back successful database mutations.
+
 ## Database Model (Firestore)
 
 ### Collections
@@ -275,6 +300,9 @@ All routes prefixed with `/api/`. List endpoints support `page` and `limit` quer
 4. **Get the Firebase Web API key**
 
    Ping @chunnc to get the `WEB_API_KEY` value, then update it in your `.env` file.
+
+   For cache invalidation outside local development, also set `FRONTEND_REVALIDATION_URL` and
+   `CACHE_REVALIDATION_SECRET` as described in [Frontend cache coordination](#frontend-cache-coordination).
 
 5. **Login to Firebase**
 
