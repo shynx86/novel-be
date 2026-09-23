@@ -17,6 +17,9 @@ describe("GET /api/genres/:slug", () => {
     const res = await app.request("/api/genres/ngon-tinh");
 
     expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=0, s-maxage=86400, stale-while-revalidate=604800",
+    );
     await expect(res.json()).resolves.toEqual({
       data: { id: "ngon-tinh", name: "Ngôn Tình", slug: "ngon-tinh" },
     });

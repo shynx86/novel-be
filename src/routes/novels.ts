@@ -1,5 +1,6 @@
 import type admin from "firebase-admin";
 import { Hono } from "hono";
+import { GENRE_NOVELS_CACHE_CONTROL, GENRE_NOVELS_SEARCH_CACHE_CONTROL } from "../config/cache.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -132,6 +133,12 @@ novels.get("/", async (c) => {
     genre_id: genreId,
     search,
   });
+  if (genreId) {
+    c.header(
+      "Cache-Control",
+      search ? GENRE_NOVELS_SEARCH_CACHE_CONTROL : GENRE_NOVELS_CACHE_CONTROL,
+    );
+  }
   return c.json({ data: result }, 200);
 });
 

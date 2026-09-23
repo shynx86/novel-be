@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { cacheInvalidationMiddleware } from "./middleware/cache-invalidation.js";
 import { requestLogger } from "./middleware/request-logger.js";
 import { registerRoutes } from "./routes/index.js";
 import {
@@ -42,6 +43,7 @@ app.use(
   }),
 );
 app.use(requestLogger);
+app.use(cacheInvalidationMiddleware);
 
 app.onError((err, c) => {
   if (err instanceof AppError) {

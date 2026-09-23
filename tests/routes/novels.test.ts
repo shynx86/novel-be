@@ -95,6 +95,29 @@ describe("GET /api/novels", () => {
     expect(body.data.total).toBe(1);
     expect(body.data.page).toBe(1);
   });
+
+  it("caches genre listings for two hours at shared caches", async () => {
+    mockCountGet.mockResolvedValue({ data: () => ({ count: 0 }) });
+    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
+
+    const res = await app.request("/api/novels?genre_id=fantasy&page=1");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=0, s-maxage=7200, stale-while-revalidate=86400",
+    );
+  });
+
+  it("uses a shorter shared-cache lifetime for searched genre listings", async () => {
+    mockQueryGet.mockResolvedValue({ docs: [], empty: true });
+
+    const res = await app.request("/api/novels?genre_id=fantasy&search=hero");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=0, s-maxage=300, stale-while-revalidate=3600",
+    );
+  });
 });
 
 // ─── Curated novel lists ──────────────────────────────────────────────
