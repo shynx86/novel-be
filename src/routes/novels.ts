@@ -1,6 +1,10 @@
 import type admin from "firebase-admin";
 import { Hono } from "hono";
-import { GENRE_NOVELS_CACHE_CONTROL, GENRE_NOVELS_SEARCH_CACHE_CONTROL } from "../config/cache.js";
+import {
+  GENRE_NOVELS_CACHE_CONTROL,
+  GENRE_NOVELS_SEARCH_CACHE_CONTROL,
+  HOMEPAGE_CACHE_CONTROL,
+} from "../config/cache.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { optionalAuthMiddleware } from "../middleware/optional-auth.js";
 import { rateLimit } from "../middleware/rate-limit.js";
@@ -53,6 +57,7 @@ novels.get("/trending", async (c) => {
     search,
     c.req.query("include_total") !== "false",
   );
+  if (!search) c.header("Cache-Control", HOMEPAGE_CACHE_CONTROL);
   return c.json({ data: result }, 200);
 });
 
@@ -74,6 +79,7 @@ novels.get("/featured", async (c) => {
     search,
     c.req.query("include_total") !== "false",
   );
+  if (!search) c.header("Cache-Control", HOMEPAGE_CACHE_CONTROL);
   return c.json({ data: result }, 200);
 });
 
@@ -87,6 +93,7 @@ novels.get("/completed-featured", async (c) => {
     search,
     c.req.query("include_total") !== "false",
   );
+  if (!search) c.header("Cache-Control", HOMEPAGE_CACHE_CONTROL);
   return c.json({ data: result }, 200);
 });
 
@@ -104,6 +111,7 @@ novels.get("/newest-chapters", async (c) => {
   const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 50)) : 10;
   const search = c.req.query("search") || undefined;
   const result = await listNewestChapters(limit, search);
+  if (!search) c.header("Cache-Control", HOMEPAGE_CACHE_CONTROL);
   return c.json({ data: result }, 200);
 });
 

@@ -62,10 +62,11 @@ Request → CORS → Request Logger → Route Handler → Error Handler → Resp
 
 ## Frontend cache coordination
 
-Genre responses are cached at two separate layers:
+Public homepage and genre responses are cached at two separate layers:
 
-- Public API responses include shared-cache headers: genres use a 24-hour TTL, genre-filtered
-  novel lists use a 2-hour TTL, and searches within a genre use a 5-minute TTL.
+- Public API responses include shared-cache headers: homepage feeds use a 2-hour TTL, genres use a
+  24-hour TTL, genre-filtered novel lists use a 2-hour TTL, and searches within a genre use a
+  5-minute TTL.
 - The Next.js frontend also stores these responses in its Data Cache. This cache is separate from
   Firebase Cloud Functions and is not automatically invalidated when Firestore changes.
 
@@ -84,6 +85,10 @@ public client environment variable.
 Both settings are optional for local development. When either setting is absent, the callback is a
 no-op and admin mutations still succeed; cached data refreshes naturally when its TTL expires.
 Callback failures are logged and do not roll back successful database mutations.
+
+Homepage feeds are intentionally not invalidated by admin novel or chapter mutations. Their
+Next.js and shared-cache entries refresh on the 2-hour TTL to avoid extra renders and backend reads.
+The `homepage` tag remains available on the frontend for exceptional manual revalidation.
 
 ## Database Model (Firestore)
 

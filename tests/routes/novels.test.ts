@@ -147,6 +147,9 @@ describe("curated novel list pagination", () => {
       expect(mockQueryWhere).toHaveBeenCalledWith(...filter);
     }
     expect(mockQueryLimit).toHaveBeenCalledWith(10);
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=0, s-maxage=7200, stale-while-revalidate=86400",
+    );
   });
 
   it("uses the fixed page size to offset the second page", async () => {
@@ -194,6 +197,18 @@ describe("curated novel list pagination", () => {
     expect(body.data.items).toHaveLength(10);
     expect(body.data.items[0].id).toBe("novel-1");
     expect(mockCountGet).not.toHaveBeenCalled();
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
+  it("caches the unfiltered newest-chapter feed for two hours", async () => {
+    mockQueryGet.mockResolvedValue({ docs: [], size: 0, empty: true });
+
+    const res = await app.request("/api/novels/newest-chapters?limit=10");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe(
+      "public, max-age=0, s-maxage=7200, stale-while-revalidate=86400",
+    );
   });
 
   it("searches normalized titles and ranks view counts numerically", async () => {
