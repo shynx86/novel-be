@@ -78,8 +78,12 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
     updated_at: now,
   };
 
+  if (input.publication_status !== undefined) {
+    novelData.publication_status = input.publication_status;
+  }
+
   if (!existingNovel.exists) {
-    novelData.publication_status = input.publication_status || "draft";
+    novelData.publication_status ??= "draft";
     novelData.chapter_count = 0;
     novelData.public_chapter_count = 0;
     novelData.total_word_count = 0;
@@ -182,9 +186,7 @@ export async function upsertNovelMeta(input: NovelMetaInput): Promise<{
     description: input.description ?? "",
     cover_url: input.cover_url ?? "",
     status: mapStatus(input.status),
-    publication_status:
-      input.publication_status ??
-      (existingNovel.data()?.publication_status === "draft" ? "draft" : "public"),
+    publication_status: mergedData.publication_status === "draft" ? "draft" : "public",
     chapter_count: (existingNovel.data()?.chapter_count as number) ?? 0,
     public_chapter_count:
       (existingNovel.data()?.public_chapter_count as number) ??

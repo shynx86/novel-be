@@ -23,4 +23,36 @@ describe("push novel slug handling", () => {
       { merge: true },
     );
   });
+
+  it("updates description and keeps the uploaded novel as draft", async () => {
+    mockDocGet.mockResolvedValueOnce({
+      exists: true,
+      data: () => ({
+        slug: "truyen-cu",
+        title: "Truyện cũ",
+        description: "Mô tả cũ",
+        publication_status: "public",
+        author_ids: [],
+        genre_ids: [],
+      }),
+    });
+    mockDocSet.mockResolvedValue(undefined);
+
+    const result = await upsertNovelMeta({
+      slug: "truyen-cu",
+      title: "Truyện cũ",
+      description: "Mô tả mới",
+      publication_status: "draft",
+    });
+
+    expect(mockDocSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: "Mô tả mới",
+        publication_status: "draft",
+      }),
+      { merge: true },
+    );
+    expect(result.novel.description).toBe("Mô tả mới");
+    expect(result.novel.publication_status).toBe("draft");
+  });
 });
