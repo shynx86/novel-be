@@ -50,6 +50,23 @@ describe("rewriteChapter", () => {
     });
   });
 
+  it("sends the entered prompt as the sole system message and the source chapter last", async () => {
+    const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
+
+    await rewriteChapter({ ...base, customPrompt: "  Chỉ dùng hướng dẫn này  " });
+
+    const request = fetchMock.mock.calls[0]?.[1];
+    const payload = JSON.parse(String(request?.body)) as {
+      messages: { role: string; content: string }[];
+    };
+    expect(payload.messages).toHaveLength(2);
+    expect(payload.messages[0]).toEqual({ role: "system", content: "Chỉ dùng hướng dẫn này" });
+    expect(payload.messages[1]?.role).toBe("user");
+    expect(
+      payload.messages[1]?.content.endsWith("<source-chapter>\nNội dung chương\n</source-chapter>"),
+    ).toBe(true);
+  });
+
   it("sends an explicitly selected Beta model", async () => {
     const fetchMock = jest.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 

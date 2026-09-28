@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { buildBetaPrompt, getDefaultCustomPrompt } from "../../src/services/ai/beta-prompt.js";
 
 describe("buildBetaPrompt", () => {
-  it("includes the system instruction and chapter context", () => {
+  it("uses only the default prompt as system and keeps the source chapter last", () => {
     const prompt = buildBetaPrompt({
       novelTitle: "Tiên Hiệp",
       chapterIndex: 3,
@@ -11,13 +11,16 @@ describe("buildBetaPrompt", () => {
       customPrompt: "",
     });
 
-    expect(prompt.system).toContain("Bạn là biên tập viên tiểu thuyết tiếng Việt");
-    expect(prompt.system).toContain("Chỉ trả về nội dung chương đã được biên tập");
+    expect(prompt.system).toBe(getDefaultCustomPrompt());
     expect(prompt.user).toContain("<novel-context>");
     expect(prompt.user).toContain("Tên truyện: Tiên Hiệp");
     expect(prompt.user).toContain("Chương: 3");
     expect(prompt.user).toContain("<source-chapter>");
     expect(prompt.user).toContain("Nội dung chương.");
+    expect(prompt.user.endsWith("<source-chapter>\nNội dung chương.\n</source-chapter>")).toBe(
+      true,
+    );
+    expect(prompt.user).not.toContain(getDefaultCustomPrompt());
   });
 
   it("uses the custom prompt when provided", () => {
@@ -29,10 +32,8 @@ describe("buildBetaPrompt", () => {
       customPrompt: "  Viết theo văn phong hài hước  ",
     });
 
-    expect(prompt.user).toContain("<custom-instructions>");
-    expect(prompt.user).toContain("Viết theo văn phong hài hước");
-    // System instructions must never be overwritten by user input.
-    expect(prompt.system).not.toContain("huyền thoại");
+    expect(prompt.system).toBe("Viết theo văn phong hài hước");
+    expect(prompt.user).not.toContain("Viết theo văn phong hài hước");
   });
 
   it("falls back to the default custom prompt when empty", () => {
@@ -44,7 +45,7 @@ describe("buildBetaPrompt", () => {
       customPrompt: "   ",
     });
 
-    expect(prompt.user).toContain(getDefaultCustomPrompt());
+    expect(prompt.system).toBe(getDefaultCustomPrompt());
   });
 
   it("adds the previous chapter context and truncates it", () => {
